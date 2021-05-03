@@ -118,6 +118,7 @@ namespace SockGet.Client
 
 
 
+
         internal SGClient(Socket socket)
         {
             this.socket = socket;

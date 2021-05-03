@@ -31,29 +31,33 @@ namespace SockGet.Data
             get => body == null ? null : (body.Length >= 64 * 1024 ? "..." : new StreamReader(body).ReadToEnd());
             set => body = string.IsNullOrEmpty(value) ? null : new MemoryStream(Encoding.UTF8.GetBytes(value));
         }
-
-        public static Message From(object obj)
-        {
-            return From("", obj);
-        }
-        public static Message From(string head , object body)
+ 
+        public static Message Create(string head , object body)
         {
             var msg = new Message();
-            msg.Head = head;
 
-            if (body is string)
-            {
-                msg.Info = "@string";
-                msg.Body = (string)body;
-            }
-            else
-            {
-                msg.Info = body.GetType().Name;
-                msg.Body = Serializer.Serialize(body);
-            }
+            msg.Load(head, body);
+
 
             return msg;
         }
+
+        internal void Load(string head , object body)
+        {
+            Head = head;
+
+            if (body is string)
+            {
+                Info = "@string";
+                Body = (string)body;
+            }
+            else
+            {
+                Info = body.GetType().Name;
+                Body = Serializer.Serialize(body);
+            }
+        }
+
 
         Stream info;
         Stream head;

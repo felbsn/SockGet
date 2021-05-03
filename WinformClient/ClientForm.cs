@@ -132,9 +132,16 @@ namespace WinformClient
             }
         }
 
-        private void btnSend_Click(object sender, EventArgs e)
+        private  async void btnSend_Click(object sender, EventArgs e)
         {
-            client.SendMessage(name, tbMessage.Text);
+            var response = await client.RequestAsync(name, tbMessage.Text);
+            if(response.IsOK)
+            {
+                logPanel.Info("Response:" + response.Head + " body:" + response.Body);
+            }else
+            {
+                logPanel.Error("Response returned error");
+            }
         }
 
         private void tbMessage_KeyPress(object sender, KeyPressEventArgs e)

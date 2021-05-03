@@ -36,16 +36,21 @@ namespace WinformServer
 
                 e.Client.DataReceived += (ss, ee) =>
                 {
-                    if (ee.Data.Body.Contains("cef"))
+                    if (ee.Data.Body != null && ee.Data.Body.Contains("cef"))
                     {
                         logPanel.Error(ee.Data.Head + " Message rejected" );
                         ee.Response = Response.Error("some error occurred");
                     }else
                     {
+                        string receivers = "";
                         foreach (var c in server.Clients)
                         {
-                            c.SendMessage(ee.Data.Head, ee.Data.Body);
+                            if (c != e.Client)
+                                receivers +=c["name"] + ",";
+
+                            c.Message(ee.Data.Head, ee.Data.Body);
                         }
+                        ee.Response = Response.From("Message recevied by", receivers);
                     }
                 };
             };

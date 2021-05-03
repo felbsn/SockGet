@@ -76,7 +76,7 @@ namespace ConsoleClient
                         Console.Write(">");
                         var line = Console.ReadLine();
 
-                        var response = client.SendRequest(name, line);
+                        var response = client.Request(name, line);
                         if(response.IsOK)
                         {
                             Log("message was successfully sent");

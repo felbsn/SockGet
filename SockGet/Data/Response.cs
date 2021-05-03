@@ -48,6 +48,19 @@ namespace SockGet.Data
             };
         }
 
+        public static Response From(object body)
+        {
+            return From("", body);
+        }
+        public static Response From(string head, object body)
+        {
+            var res = new Response();
+            res.Load(head, body);
+            return res;
+        }
+
+         
+
         public static readonly Response Empty  = new Response() { };
     }
 }

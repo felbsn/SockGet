@@ -12,7 +12,7 @@ namespace SockGet.Core.Enums
         AuthRequest,
         AuthResponse,
         TagRequest,
-        TagResponse,
+        TagSync,
         Request,
         Response,
     }

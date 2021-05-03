@@ -69,7 +69,7 @@ namespace ConsoleServer
                             {
                                 foreach (var client in server.Clients)
                                 {
-                                    client.SendMessage(ee.Data.Head + "X", ee.Data.Body);
+                                    client.Message(ee.Data.Head + "X", ee.Data.Body);
                                 }
 
                                 ee.Response = Response.OK();
@@ -87,7 +87,7 @@ namespace ConsoleServer
 
                     foreach (var client in server.Clients)
                     {
-                        client.SendMessage("server", line);
+                        client.Message("server", line);
                     }
                 }
             }

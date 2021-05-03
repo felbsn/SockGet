@@ -38,24 +38,45 @@ namespace SockGet.Core
         {
             return socket != null && !((socket.Poll(1000, SelectMode.SelectRead) && (socket.Available == 0)) || !socket.Connected);
         }
-        public void SendMessage(string action, string content)
+
+        public string this[string key]
+        {
+            get => Tags.TryGetValue(key, out var value) ? value : null;
+        }
+
+        public Task<Result> RequestAsync(string action, string content) => Task.Run(() => Request(action, content));
+        public Task<string> RequestTagAsync(string tagName) => Task.Run(() => RequestTag(tagName));
+
+
+
+        public void Message(string action, string content)
         {
             Send(new Message()
             {
                 Head = action,
                 Body = content
-            });
+            }, Token.Message);
         }
-        public Result SendRequest(string action, string content)
+        public void SyncTags()
+        {
+            Send(Data.Message.Create("tags" ,Tags), Token.Message);
+        }
+        public Result Request(string action, string content)
         {
             return Request(new Message()
             {
                 Head = action,
                 Body = content
-            });
+            },Token.Request);
         }
-
-
+        public string RequestTag(string tagName)
+        {
+            return Request(new Message()
+            {
+                Head = tagName,
+            },
+            Token.TagRequest).Head;
+        }
 
         protected Socket socket;
         protected SGSocket()
@@ -63,15 +84,12 @@ namespace SockGet.Core
             pending = new Dictionary<byte, TaskCompletionSource<Result>>();
             tags = new Dictionary<string, string>();
         }
-
-
   
         int counter;
         Dictionary<string, string> tags;
         Dictionary<byte, TaskCompletionSource<Result>> pending;
 
         internal event EventHandler<AuthRequestedEventArgs> AuthRequested;
-  
 
         internal void Listen()
         {
@@ -90,7 +108,7 @@ namespace SockGet.Core
                             {
                                 var token = (Token)header.token;
 
-              
+
                                 socket.ReadBytes(header.infoLength, out var infoBuffer);
                                 socket.ReadBytes(header.headLength, out var headBuffer);
                          
@@ -168,8 +186,24 @@ namespace SockGet.Core
                                             }
                                         }
                                         break;
-                                    default:
+                                    case Token.TagRequest:
+
+                                        if (!Tags.TryGetValue(head, out var value))
+                                            value = null;
+                                        Response(header.id, Data.Message.Create(head, value));
                                         break;
+
+                                    case Token.TagSync:
+                                        {
+                                            var tags = received.As<Dictionary<string, string>>();
+                                            foreach (var pair in tags)
+                                            {
+                                                this.tags[pair.Key] = pair.Value;
+                                            }
+                                        }
+                                        break;
+                                    default:
+                                        throw new Exception("Unsupported Token " + token.ToString());
                                 }
                             }
                         }
@@ -275,10 +309,10 @@ namespace SockGet.Core
 
             return IsAuthorised;
         }
-        internal void Send(Message message)
+        internal void Send(Message message, Token token)
         {
             var stream = message.GetStream(out var header);
-            header.token = (byte)Token.Message;
+            header.token = (byte)token;
             Transmit(header, stream);
         }
         internal void Response(byte id , Message message)
@@ -288,7 +322,7 @@ namespace SockGet.Core
             header.token = (byte)Token.Response;
             Transmit(header, stream);
         }
-        internal Result Request(Message message)
+        internal Result Request(Message message ,Token token)
         {
             byte id = (byte)Interlocked.Increment(ref counter);
 
@@ -297,7 +331,7 @@ namespace SockGet.Core
 
             var stream = message.GetStream(out var header);
             header.id = id;
-            header.token = (byte)Token.Request;
+            header.token = (byte)token;
             Transmit(header, stream);
 
             try
