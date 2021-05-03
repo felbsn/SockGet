@@ -1,0 +1,53 @@
+﻿using SockGet.Core.Enums;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace SockGet.Data
+{
+    public class Response : Message
+    {
+        public static Response Cancel(string message = null, string details = null)
+        {
+            return new Response()
+            {
+                Head = message,
+                Body = details,
+                Info = "@cancel",
+            };
+        }
+        public static Response OK(string message = null, string details = null)
+        {
+            return new Response()
+            {
+                Head = message,
+                Body = details,
+                Info = "@ok"
+            };
+        }
+        public static Response Error(string message = null,string details = null)
+        {
+            return new Response()
+            {
+                Body = details,
+                Head = message,
+                Info = "@error"
+            };
+        }
+
+        public static Response Reject(string message = null, string details = null)
+        {
+            return new Response()
+            {
+                Body = details,
+                Head = message,
+                Info = "@reject"
+            };
+        }
+
+        public static readonly Response Empty  = new Response() { };
+    }
+}
