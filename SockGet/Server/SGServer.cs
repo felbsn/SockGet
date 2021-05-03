@@ -13,6 +13,11 @@ namespace SockGet.Server
 {
     public class SGServer
     {
+        public event EventHandler<EventArgs> Started;
+        public event EventHandler<EventArgs> Stopped;
+
+
+
         public event EventHandler<ClientAuthRequestedEventArgs> ClientAuthRequested;
         public event EventHandler<ClientConnectionEventArgs> ClientConnected;
         public event EventHandler<ClientConnectionEventArgs> ClientDisconnected;
@@ -25,6 +30,7 @@ namespace SockGet.Server
         public void Stop()
         {
             socket.Close();
+            socket = null;
         }
 
         public SGServer()
@@ -39,8 +45,8 @@ namespace SockGet.Server
             socket = new Socket(ip.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             IPEndPoint localEndPoint = new IPEndPoint(ip, port);
             socket.Bind(localEndPoint);
-
             Accept();
+            Started?.Invoke(this, EventArgs.Empty);
         }
 
         void Accept()
@@ -79,7 +85,22 @@ namespace SockGet.Server
                 catch (Exception ex)
                 {
                     _ = ex;
-                    //throw;
+                    Stopped?.Invoke(this , EventArgs.Empty);
+                }
+                finally
+                {
+                    foreach (var client in Clients)
+                    {
+                        try
+                        {
+                            client.Close();
+                        }
+                        catch (Exception ex)
+                        {
+                            _ = ex;
+                        }    
+                    }
+                    clients.Clear();
                 }
             }));
         }

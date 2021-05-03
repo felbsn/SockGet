@@ -31,11 +31,12 @@ namespace SockGet.Core
         public string AuthToken { get;  set; }
         public void Close()
         {
-            socket.Disconnect(true);
+            socket.Close();
+            socket = null;
         }
         public bool IsConnected()
         {
-            return !((socket.Poll(1000, SelectMode.SelectRead) && (socket.Available == 0)) || !socket.Connected);
+            return socket != null && !((socket.Poll(1000, SelectMode.SelectRead) && (socket.Available == 0)) || !socket.Connected);
         }
         public void SendMessage(string action, string content)
         {
@@ -180,11 +181,17 @@ namespace SockGet.Core
                 }
                 catch (Exception ex)
                 {
-                    //throw ex;
-                    _ = 2;
+                    _ = ex;
                 }
                 finally
                 {
+                    // exception probably caused by internal logic, so closing connection maybe the best option available
+                    if (IsConnected())
+                    {
+                        socket.Close();
+                    }
+
+
                     if (IsAuthorised)
                     {
                         Disconnected?.Invoke(this, EventArgs.Empty);
@@ -195,7 +202,7 @@ namespace SockGet.Core
                         AuthRespond?.Invoke(this, args);
                     }
                     IsAuthorised = false;
-                    socket.Dispose();
+                    socket?.Dispose();
                     socket = null;
                 }
             }));

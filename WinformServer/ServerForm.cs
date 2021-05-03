@@ -56,6 +56,25 @@ namespace WinformServer
                 logPanel.Info("Client disconnected "  + e.Client.Tags["name"]);
             };
 
+            server.Started += (s, e) =>
+            {
+                Invoke(new Action(() =>
+                {
+                    btnStart.Text = "Stop";
+                    logPanel.Info("Server is running....");
+                }));
+         
+            };
+
+            server.Stopped += (s, e) =>
+            {
+                Invoke(new Action(() =>
+                {
+                    btnStart.Text = "Start";
+                    logPanel.Info("Stopped");
+                }));
+
+            };
 
             Load += (s, e) =>
             {
@@ -64,31 +83,28 @@ namespace WinformServer
         }
 
 
-
-
-
         bool connected = false;
         private void btnStart_Click(object sender, EventArgs e)
         {
             if(connected)
             {
                 server.Stop();
-                btnStart.Text = "Stop";
                 connected = false;
-                logPanel.Info("Stopped.");
-
             }
             else
             {
                 if(int.TryParse(tbPort.Text , out var port))
                 {
-                    server.Serve(port);
+                    try
+                    {
+                        server.Serve(port);
 
-                    logPanel.Info("Serving...");
-
-                    connected = true;
-
-                    btnStart.Text = "Connected";
+                        connected = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        logPanel.Error(ex.Message + "\r" + ex.StackTrace);
+                    }
                 }
             }
         }

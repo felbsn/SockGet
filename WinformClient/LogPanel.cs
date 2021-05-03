@@ -42,11 +42,11 @@ namespace WinformClient
 
         protected void Log(string code ,  string str , Color color   )
         {
-            str += "\n";
             if (InvokeRequired)
                 BeginInvoke(new Action(() => Log(code, str,color)));
             else
             {
+                str += "\n";
                 AppendText(tbMain, $"{code}:{str}", color);
            
                 tbMain.SelectionStart = tbMain.Text.Length;

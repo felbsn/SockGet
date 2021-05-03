@@ -42,18 +42,16 @@ namespace WinformClient
 
         protected void Log(string code ,  string str , Color color   )
         {
-            str += "\r\n";
-
             if (InvokeRequired)
                 Invoke(new Action(() => Log(code, str,color)));
             else
             {
+                str += "\n";
                 AppendText(tbMain, $"{code}:{str}", color);
 
                 tbMain.SelectionStart = tbMain.Text.Length;
                 // scroll it automatically
                 tbMain.ScrollToCaret();
-
             }
         }
 

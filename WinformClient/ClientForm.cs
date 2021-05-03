@@ -31,11 +31,24 @@ namespace WinformClient
 
             client.Connected += (s, e) =>
             {
-                logPanel.Info("Connected");
+                Invoke(new Action(() =>
+                {
+                    tbPort.ReadOnly = true;
+                    tbAddress.ReadOnly = true;
+                    logPanel.Info("Connected");
+                    tbConnect.Text = "Connected";
+                }));
             };
             client.Disconnected += (s, e) =>
             {
-                logPanel.Info("Disconnected");
+                Invoke(new Action(() =>
+                {
+                    tbAddress.ReadOnly = false;
+                    tbPort.ReadOnly = false;
+                    logPanel.Info("Disconnected");
+                    tbConnect.Text = "Connect";
+                }));
+               
                 connected = false;
 
             };
