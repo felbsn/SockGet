@@ -62,7 +62,7 @@ namespace WinformClient
             this.tbMessage.Multiline = true;
             this.tbMessage.Name = "tbMessage";
             this.tbMessage.Size = new System.Drawing.Size(707, 76);
-            this.tbMessage.TabIndex = 0;
+            this.tbMessage.TabIndex = 9;
             this.tbMessage.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.tbMessage_KeyPress);
             // 
             // btnSend
@@ -71,7 +71,7 @@ namespace WinformClient
             this.btnSend.Location = new System.Drawing.Point(707, 0);
             this.btnSend.Name = "btnSend";
             this.btnSend.Size = new System.Drawing.Size(93, 76);
-            this.btnSend.TabIndex = 1;
+            this.btnSend.TabIndex = 10;
             this.btnSend.Text = "Send";
             this.btnSend.UseVisualStyleBackColor = true;
             this.btnSend.Click += new System.EventHandler(this.btnSend_Click);
@@ -112,7 +112,7 @@ namespace WinformClient
             this.btnSelectAuth.Location = new System.Drawing.Point(557, 4);
             this.btnSelectAuth.Name = "btnSelectAuth";
             this.btnSelectAuth.Size = new System.Drawing.Size(104, 23);
-            this.btnSelectAuth.TabIndex = 4;
+            this.btnSelectAuth.TabIndex = 15;
             this.btnSelectAuth.Text = "Select Auth File";
             this.btnSelectAuth.UseVisualStyleBackColor = true;
             this.btnSelectAuth.Click += new System.EventHandler(this.btnSelectAuth_Click);
@@ -122,7 +122,7 @@ namespace WinformClient
             this.tbPort.Location = new System.Drawing.Point(173, 5);
             this.tbPort.Name = "tbPort";
             this.tbPort.Size = new System.Drawing.Size(52, 22);
-            this.tbPort.TabIndex = 3;
+            this.tbPort.TabIndex = 6;
             this.tbPort.Text = "9999";
             // 
             // tbConnect
@@ -130,7 +130,7 @@ namespace WinformClient
             this.tbConnect.Location = new System.Drawing.Point(231, 4);
             this.tbConnect.Name = "tbConnect";
             this.tbConnect.Size = new System.Drawing.Size(75, 23);
-            this.tbConnect.TabIndex = 2;
+            this.tbConnect.TabIndex = 8;
             this.tbConnect.Text = "Connect";
             this.tbConnect.UseVisualStyleBackColor = true;
             this.tbConnect.Click += new System.EventHandler(this.tbConnect_Click);
@@ -140,7 +140,7 @@ namespace WinformClient
             this.tbAddress.Location = new System.Drawing.Point(3, 5);
             this.tbAddress.Name = "tbAddress";
             this.tbAddress.Size = new System.Drawing.Size(164, 22);
-            this.tbAddress.TabIndex = 1;
+            this.tbAddress.TabIndex = 5;
             // 
             // logPanel
             // 

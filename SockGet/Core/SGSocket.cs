@@ -180,7 +180,7 @@ namespace SockGet.Core
                 }
                 catch (Exception ex)
                 {
-                    throw ex;
+                    //throw ex;
                     _ = 2;
                 }
                 finally

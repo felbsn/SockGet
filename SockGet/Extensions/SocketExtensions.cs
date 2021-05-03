@@ -17,7 +17,7 @@ namespace SockGet.Extensions
             
             while(received + read < count)
             {
-                read = socket.Receive(buffer, received, count, SocketFlags.None);
+                read = socket.Receive(buffer, received, count - received, SocketFlags.None);
                 received += read;
                 read = 0;
             }
@@ -28,7 +28,7 @@ namespace SockGet.Extensions
 
             while (received  < count)
             {
-                int read = socket.Receive(buffer, received + offset, count, SocketFlags.None);
+                int read = socket.Receive(buffer, received + offset, count - received, SocketFlags.None);
                 if (read == 0)
                     return 0;
 

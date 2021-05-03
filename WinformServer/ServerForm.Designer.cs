@@ -95,7 +95,7 @@ namespace WinformServer
             this.tbPort.Location = new System.Drawing.Point(35, 6);
             this.tbPort.Name = "tbPort";
             this.tbPort.Size = new System.Drawing.Size(63, 20);
-            this.tbPort.TabIndex = 1;
+            this.tbPort.TabIndex = 10;
             this.tbPort.Text = "9999";
             // 
             // btnStart
@@ -103,7 +103,7 @@ namespace WinformServer
             this.btnStart.Location = new System.Drawing.Point(104, 4);
             this.btnStart.Name = "btnStart";
             this.btnStart.Size = new System.Drawing.Size(73, 23);
-            this.btnStart.TabIndex = 0;
+            this.btnStart.TabIndex = 9;
             this.btnStart.Text = "Start";
             this.btnStart.UseVisualStyleBackColor = true;
             this.btnStart.Click += new System.EventHandler(this.btnStart_Click);

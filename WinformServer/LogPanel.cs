@@ -49,7 +49,11 @@ namespace WinformClient
             else
             {
                 AppendText(tbMain, $"{code}:{str}", color);
+
                 tbMain.SelectionStart = tbMain.Text.Length;
+                // scroll it automatically
+                tbMain.ScrollToCaret();
+
             }
         }
 
