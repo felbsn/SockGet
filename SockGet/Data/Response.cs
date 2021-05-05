@@ -17,6 +17,7 @@ namespace SockGet.Data
                 Head = message,
                 Body = details,
                 Info = "@cancel",
+                IsError = true,
             };
         }
         public static Response OK(string message = null, string details = null)
@@ -35,6 +36,7 @@ namespace SockGet.Data
                 Body = details,
                 Head = message,
                 Info = "@error"
+                IsError = true,
             };
         }
 
@@ -45,6 +47,7 @@ namespace SockGet.Data
                 Body = details,
                 Head = message,
                 Info = "@reject"
+                IsError = true,
             };
         }
 
@@ -62,5 +65,7 @@ namespace SockGet.Data
          
 
         public static readonly Response Empty  = new Response() { };
+
+        public bool IsError { get; internal set; }
     }
 }

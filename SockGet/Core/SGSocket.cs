@@ -29,9 +29,9 @@ namespace SockGet.Core
         public Dictionary<string, string> Tags => tags;
         public DataReceiver Receiver { get; set; }
         public string AuthToken { get;  set; }
-        public void Close()
+        public void Close(int timeout = 0)
         {
-            socket.Close();
+            socket.Close(timeout);
             socket = null;
         }
         public bool IsConnected()
@@ -144,19 +144,24 @@ namespace SockGet.Core
 
                                             var args = new AuthRequestedEventArgs(head);
                                             AuthRequested?.Invoke(this, args);
-                                            if (args.Reject)
+
+                                            var response = args.Response ?? Data.Response.Empty;
+                                            if (args.Reject || response.IsError)
                                             {
-                                                Close();
+                                                Authorize(response, false);
+                                                // leave loop
+                                                break;
                                             }
                                             else
                                             {
-                                                Authorize(args.Response ?? Data.Response.Empty);
+                                                Authorize(response, true);
                                             }
                                         }
                                         break;
                                     case Token.AuthResponse:
                                         {
-                                            var args = new AuthRespondEventArgs(head, body, false);
+                                            var reject = header.id == 0;
+                                            var args = new AuthRespondEventArgs(head, body, reject);
                                             AuthRespond?.Invoke(this, args);
                                         }
                                         break;
@@ -220,21 +225,24 @@ namespace SockGet.Core
                 finally
                 {
                     // exception probably caused by internal logic, so closing connection maybe the best option available
+                    // or auth rejected by server 
                     if (IsConnected())
                     {
-                        socket.Close();
+                        socket.Close(500);
                     }
-
 
                     if (IsAuthorised)
                     {
+
                         Disconnected?.Invoke(this, EventArgs.Empty);
                     }
                     else
                     {
+                        //if auth failed without response, simulate respond event with rejection
                         var args = new AuthRespondEventArgs(null, null, true);
                         AuthRespond?.Invoke(this, args);
                     }
+
                     IsAuthorised = false;
                     socket?.Dispose();
                     socket = null;
@@ -255,11 +263,12 @@ namespace SockGet.Core
                 }
             }
         }
-        internal void Authorize(Message data)
+        internal void Authorize(Message data , bool accept )
         {
             var stream = data.GetStream(out var header);
 
             header.token = (byte)Token.AuthResponse;
+            header.id = (byte)(accept ? 1 : 0);
             Transmit(header, stream);
         }
         internal bool Authenticate()
@@ -297,6 +306,7 @@ namespace SockGet.Core
             {
                 return false;
             }
+
 
             IsAuthorised = tcs.Task.Result;
 

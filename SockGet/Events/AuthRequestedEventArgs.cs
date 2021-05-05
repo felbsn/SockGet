@@ -15,7 +15,6 @@ namespace SockGet.Events
         }
         public string AuthToken { get; private set; }
         public bool Reject{ get; set; }
-
         public Response Response { get; set; }
     }
 }
