@@ -109,8 +109,9 @@ namespace SockGet.Client
 
             while (!connected && (timeout == int.MaxValue || (sw.ElapsedMilliseconds < timeout)))
             {
-                connected = Connect(address, port);
-                await Task.Delay(500);
+                connected = await Task.Run(()=> Connect(address, port));
+                if(!connected)
+                    await Task.Delay(500);
             }
             return connected;
         }

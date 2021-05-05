@@ -66,7 +66,8 @@ namespace SockGet.Server
                             
                             var args = new ClientAuthRequestedEventArgs(client, e.AuthToken , e.Response);
                             ClientAuthRequested?.Invoke(this , args);
-                     
+
+                            e.Response = args.Response;
                             e.Reject = args.Reject || (args.Response != null && args.Response.IsError);
                             if(!e.Reject)
                             {
