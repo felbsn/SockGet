@@ -35,7 +35,7 @@ namespace SockGet.Data
             {
                 Body = details,
                 Head = message,
-                Info = "@error"
+                Info = "@error",
                 IsError = true,
             };
         }
@@ -46,7 +46,7 @@ namespace SockGet.Data
             {
                 Body = details,
                 Head = message,
-                Info = "@reject"
+                Info = "@reject",
                 IsError = true,
             };
         }
