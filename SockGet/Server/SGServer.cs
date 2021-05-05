@@ -67,8 +67,8 @@ namespace SockGet.Server
                             var args = new ClientAuthRequestedEventArgs(client, e.AuthToken , e.Response);
                             ClientAuthRequested?.Invoke(this , args);
                      
-                            e.Reject = args.Reject;
-                            if(!args.Reject)
+                            e.Reject = args.Reject || (args.Response != null && args.Response.IsError);
+                            if(!e.Reject)
                             {
                                 client.Disconnected += (s1, e1) =>
                                 {

@@ -40,6 +40,8 @@ namespace SockGet.Data
             };
         }
 
+
+
         public static Response Reject(string message = null, string details = null)
         {
             return new Response()

@@ -22,11 +22,11 @@ namespace SockGet.Client
     {
         public int Port { get; protected set; }
         public string Address { get; protected set; }
-
         public SGClient() 
         {
-
+      
         }
+
         public bool Connect(int port)
         {
             IPHostEntry host = Dns.GetHostEntry("127.0.0.1");
@@ -49,6 +49,7 @@ namespace SockGet.Client
             }
             catch (Exception ex)
             {
+                throw ex;
                 return false;
             }
 
@@ -123,6 +124,8 @@ namespace SockGet.Client
         {
             this.socket = socket;
             IsAuthorised = true;
+
+            Address = socket.RemoteEndPoint.ToString();
         }
     }
 }
