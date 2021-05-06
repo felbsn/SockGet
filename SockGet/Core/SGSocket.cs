@@ -44,8 +44,8 @@ namespace SockGet.Core
             get => Tags.TryGetValue(key, out var value) ? value : null;
         }
 
-        public Task<Result> RequestAsync(string action, string content) => Task.Run(() => Request(action, content));
-        public Task<string> RequestTagAsync(string tagName) => Task.Run(() => RequestTag(tagName));
+        public Task<Result> RequestAsync(string action, string content, int timeout = -1) => Task.Run(() => Request(action, content , timeout));
+        public Task<string> RequestTagAsync(string tagName, int timeout = -1) => Task.Run(() => RequestTag(tagName ));
 
 
 
@@ -61,21 +61,21 @@ namespace SockGet.Core
         {
             Send(Data.Message.Create("tags" ,Tags), Token.Message);
         }
-        public Result Request(string action, string content)
+        public Result Request(string action, string content ,int timeout = -1)
         {
             return Request(new Message()
             {
                 Head = action,
                 Body = content
-            },Token.Request);
+            },Token.Request , timeout);
         }
-        public string RequestTag(string tagName)
+        public string RequestTag(string tagName ,int timeout = -1)
         {
             return Request(new Message()
             {
                 Head = tagName,
             },
-            Token.TagRequest).Head;
+            Token.TagRequest , timeout).Head;
         }
 
         protected Socket socket;
@@ -332,7 +332,7 @@ namespace SockGet.Core
             header.token = (byte)Token.Response;
             Transmit(header, stream);
         }
-        internal Result Request(Message message ,Token token)
+        internal Result Request(Message message ,Token token, int timeout)
         {
             byte id = (byte)Interlocked.Increment(ref counter);
 
@@ -344,9 +344,15 @@ namespace SockGet.Core
             header.token = (byte)token;
             Transmit(header, stream);
 
+            var task = tcs.Task;
             try
             {
-                return tcs.Task.Result;
+                task.Wait(timeout);
+
+                if (task.IsCompleted)
+                    return task.Result;
+                else
+                    return null;
             }
             catch (Exception ex)
             {

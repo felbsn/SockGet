@@ -50,7 +50,6 @@ namespace SockGet.Client
             catch (Exception ex)
             {
                 throw ex;
-                return false;
             }
 
             Listen();
@@ -91,26 +90,32 @@ namespace SockGet.Client
             }
             return connected;
         }
-        public async Task<bool> ConnectAsync(int port, int timeout = 200)
+        public async Task<bool> ConnectAsync(int port, int timeout = 2000)
         {
             IPHostEntry host = Dns.GetHostEntry("127.0.0.1");
             IPAddress ipAddress = host.AddressList[0];
 
             return await ConnectAsync(ipAddress.ToString(), port, timeout);
         }
-        public async Task<bool> ConnectAsync(string address, int port, int timeout = 200)
+        public async Task<bool> ConnectAsync(string address, int port, int timeout = 2000)
         {
             if (timeout == 0)
-                return Connect(address, port);
+                return await Task.Run(() => Connect(address, port));
 
             var sw = new System.Diagnostics.Stopwatch();
             sw.Start();
             bool connected = false;
 
-            while (!connected && (timeout == int.MaxValue || (sw.ElapsedMilliseconds < timeout)))
+            while (!connected && (timeout == -1 || (sw.ElapsedMilliseconds < timeout)))
             {
-                connected = await Task.Run(()=> Connect(address, port));
-                if(!connected)
+                connected = await Task.Run(() =>
+                {
+                    var t = Task.Run(() => Connect(address, port));
+                    t.Wait(timeout == -1 ? timeout : timeout - (int)sw.ElapsedMilliseconds);
+                    return t.IsCompleted ? t.Result : false;
+                });
+          
+                if(!connected && (timeout == -1 || 500 < timeout - sw.ElapsedMilliseconds))
                     await Task.Delay(500);
             }
             return connected;

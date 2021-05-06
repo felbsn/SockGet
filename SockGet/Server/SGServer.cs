@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -16,14 +17,16 @@ namespace SockGet.Server
         public event EventHandler<EventArgs> Started;
         public event EventHandler<EventArgs> Stopped;
 
-
-
         public event EventHandler<ClientAuthRequestedEventArgs> ClientAuthRequested;
         public event EventHandler<ClientConnectionEventArgs> ClientConnected;
         public event EventHandler<ClientConnectionEventArgs> ClientDisconnected;
 
         Socket socket;
         List<SGSocket> clients;
+
+        public bool KeepAlive { get; set; } = true;
+        public uint KeepAliveInterval { get; set; } = 1000;
+        public uint KeepAliveTime { get; set; } = 1000;
 
         public IReadOnlyList<SGSocket> Clients => clients;
 
@@ -63,7 +66,6 @@ namespace SockGet.Server
                         var client = new SGClient(sock);
                         client.AuthRequested += (s, e) =>
                         {
-                            
                             var args = new ClientAuthRequestedEventArgs(client, e.AuthToken , e.Response);
                             ClientAuthRequested?.Invoke(this , args);
 
@@ -71,15 +73,17 @@ namespace SockGet.Server
                             e.Reject = args.Reject || (args.Response != null && args.Response.IsError);
                             if(!e.Reject)
                             {
+                                if(KeepAlive)
+                                    SetKeepAlive(true, KeepAliveTime, KeepAliveInterval);
+
                                 client.Disconnected += (s1, e1) =>
                                 {
                                     clients.Remove(client);
                                     ClientDisconnected?.Invoke(this, new ClientConnectionEventArgs(client));
                                 };
-
                                 clients.Add(client);
                                 ClientConnected?.Invoke(this, new ClientConnectionEventArgs(client));
-                            }    
+                            }
                         };
                         client.Listen();
                     }
@@ -107,6 +111,19 @@ namespace SockGet.Server
             }));
         }
 
-  
+
+
+        void SetKeepAlive(bool on, uint keepAliveTime, uint keepAliveInterval)
+        {
+            int size = Marshal.SizeOf(new uint());
+
+            var inOptionValues = new byte[size * 3];
+
+            BitConverter.GetBytes((uint)(on ? 1 : 0)).CopyTo(inOptionValues, 0);
+            BitConverter.GetBytes((uint)keepAliveTime).CopyTo(inOptionValues, size);
+            BitConverter.GetBytes((uint)keepAliveInterval).CopyTo(inOptionValues, size * 2);
+
+            socket.IOControl(IOControlCode.KeepAliveValues, inOptionValues, null);
+        }
     }
 }
