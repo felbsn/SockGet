@@ -62,6 +62,8 @@ namespace SockGet.Server
                     {
                         socket.Listen(1);
                         var sock = socket.Accept();
+                        if (KeepAlive)
+                            SetKeepAlive(KeepAlive, KeepAliveTime, KeepAliveInterval);
 
                         var client = new SGClient(sock);
                         client.AuthRequested += (s, e) =>
@@ -73,8 +75,7 @@ namespace SockGet.Server
                             e.Reject = args.Reject || (args.Response != null && args.Response.IsError);
                             if(!e.Reject)
                             {
-                                if(KeepAlive)
-                                    SetKeepAlive(true, KeepAliveTime, KeepAliveInterval);
+                          
 
                                 client.Disconnected += (s1, e1) =>
                                 {
@@ -110,8 +111,6 @@ namespace SockGet.Server
                 }
             }));
         }
-
-
 
         void SetKeepAlive(bool on, uint keepAliveTime, uint keepAliveInterval)
         {

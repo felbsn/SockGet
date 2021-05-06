@@ -111,8 +111,16 @@ namespace SockGet.Client
                 connected = await Task.Run(() =>
                 {
                     var t = Task.Run(() => Connect(address, port));
-                    t.Wait(timeout == -1 ? timeout : timeout - (int)sw.ElapsedMilliseconds);
-                    return t.IsCompleted ? t.Result : false;
+
+                    if (t.Wait(timeout == -1 ? timeout : timeout - (int)sw.ElapsedMilliseconds))
+                    {
+                        return t.Result;
+                    }
+                    else
+                    {
+                        socket.Close();
+                        return false;
+                    };
                 });
           
                 if(!connected && (timeout == -1 || 500 < timeout - sw.ElapsedMilliseconds))
@@ -120,11 +128,6 @@ namespace SockGet.Client
             }
             return connected;
         }
-
-
-
-
-
 
         internal SGClient(Socket socket)
         {
