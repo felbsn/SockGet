@@ -36,7 +36,7 @@ namespace SockGet.Core
         }
         public bool IsConnected()
         {
-            return socket != null && !((socket.Poll(1000, SelectMode.SelectRead) && (socket.Available == 0)) || !socket.Connected);
+            return socket != null && socket.Connected;
         }
 
         public string this[string key]
@@ -99,8 +99,30 @@ namespace SockGet.Core
                 {
                     while (IsConnected())
                     {
+                        int count = 0;
                         byte[] buffer = new byte[10];
-                        var count = socket.Receive(buffer, 10, SocketFlags.None);
+
+                        var recvTcs = new TaskCompletionSource<bool>();
+                        socket.BeginReceive(buffer, 0, 10, SocketFlags.None, (asyn) => {
+                            try
+                            {
+                                int iRx = socket.EndReceive(asyn);
+                                count = iRx;
+                                recvTcs.SetResult(iRx == 10);
+                            }
+                            catch (SocketException ex)
+                            {
+                                count = 0;
+                                recvTcs.SetResult(false);
+                            }
+                        }, null);
+
+                        recvTcs.Task.Wait();
+                        if (recvTcs.Task.Result == false)
+                            throw new Exception("olmadi");
+
+
+                        //var count = socket.Receive(buffer, 10, SocketFlags.None);
                         if (count == 10)
                         {
                             var header = Header.Parse(buffer);
