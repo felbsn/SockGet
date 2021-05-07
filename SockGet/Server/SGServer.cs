@@ -28,6 +28,8 @@ namespace SockGet.Server
         public int HeartbeatInterval { get; set; } = 5000;
         public int HeartbeatTimeout { get; set; } = 1000;
 
+        public int AuthenticationTimeout { get; set; } = 2000;
+
         public IReadOnlyList<SGSocket> Clients => clients;
 
         public void Stop()
@@ -78,8 +80,6 @@ namespace SockGet.Server
                                 e.Reject = args.Reject || (args.Response != null && args.Response.IsError);
                                 if (!e.Reject)
                                 {
-
-
                                     client.Disconnected += (s1, e1) =>
                                     {
                                         lock (this)
@@ -95,11 +95,18 @@ namespace SockGet.Server
                                         clients.Add(client);
                                     }
 
-                              
                                     ClientConnected?.Invoke(this, new ClientConnectionEventArgs(client));
                                 }
                             };
                             client.Listen();
+                            Task.Delay(AuthenticationTimeout).ContinueWith(t =>
+                            {
+                                if(!client.IsAuthorised)
+                                {
+                                    client.Close();
+                                }
+                            });
+                           
                         }
                     }
                 }
@@ -132,18 +139,19 @@ namespace SockGet.Server
             {
                 try
                 {
-                    while(socket.IsBound)
+                    while(socket != null && socket.IsBound && UseHeartbeat)
                     {
-                        await Task.Delay(HeartbeatInterval);
+                       await Task.Delay(HeartbeatInterval);
 
                        var current = clients.ToArray();
                        foreach (var client in current)
                        {
-                           if (!client.IsReceiving && (DateTime.Now - client.LastReceiveTime).TotalMilliseconds > HeartbeatInterval)
+                           if (!client.IsReceiving && (DateTime.Now - client.LastReceive).TotalMilliseconds > HeartbeatInterval)
                            {
                                 try
                                 {
-                                    bool alive = client.Heartbeat(DateTime.Now.ToString(), HeartbeatTimeout);
+                                    var interval = HeartbeatInterval + HeartbeatTimeout;
+                                    bool alive = client.Heartbeat(DateTime.Now.ToString(), interval,  HeartbeatTimeout);
 
                                     if (!alive)
                                     {
@@ -156,8 +164,30 @@ namespace SockGet.Server
                                 }
                            }
                        }
-                        
-         
+                    }
+
+                    if(socket != null && socket.IsBound && !UseHeartbeat)
+                    {
+                        var current = clients.ToArray();
+                        foreach (var client in current)
+                        {
+                            if (!client.IsReceiving && (DateTime.Now - client.LastReceive).TotalMilliseconds > HeartbeatInterval)
+                            {
+                                try
+                                {
+                                    bool alive = client.Heartbeat(DateTime.Now.ToString(), 0 ,  HeartbeatTimeout);
+
+                                    if (!alive)
+                                    {
+                                        client.Close();
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    _ = ex;
+                                }
+                            }
+                        }
                     }
                 }
                 catch (Exception)
@@ -167,19 +197,6 @@ namespace SockGet.Server
                 }
             });
 
-        }
-
-        void SetKeepAlive(bool on, uint keepAliveTime, uint keepAliveInterval)
-        {
-            int size = Marshal.SizeOf(new uint());
-
-            var inOptionValues = new byte[size * 3];
-
-            BitConverter.GetBytes((uint)(on ? 1 : 0)).CopyTo(inOptionValues, 0);
-            BitConverter.GetBytes((uint)keepAliveTime).CopyTo(inOptionValues, size);
-            BitConverter.GetBytes((uint)keepAliveInterval).CopyTo(inOptionValues, size * 2);
-
-            socket.IOControl(IOControlCode.KeepAliveValues, inOptionValues, null);
         }
     }
 }

@@ -25,7 +25,6 @@ namespace SockGet.Core
         public event EventHandler Disconnected;
 
         public bool IsAuthorised { get;  protected set; }
-        public bool ThrowExceptionOnAuthFailed { get; set; } = true;
         public Dictionary<string, string> Tags => tags;
         public DataReceiver Receiver { get; set; }
         public string AuthToken { get;  set; }
@@ -73,13 +72,12 @@ namespace SockGet.Core
             },
             Token.Tag , timeout).Head;
         }
-        public bool Heartbeat(string echo, int timeout = -1)
+        public bool Heartbeat(string echo,int interval, int timeout = -1)
         {
-            return Request(new Message()
-            {
-                Head = echo,
-            },
-            Token.Heartbeat, timeout)?.Head == echo;
+            var msg = new Message();
+            msg.Load(echo, interval);
+
+            return Request(msg, Token.Heartbeat, timeout)?.Head == echo;
         }
 
 
@@ -98,7 +96,7 @@ namespace SockGet.Core
 
         internal event EventHandler<AuthRequestedEventArgs> AuthRequested;
 
-        internal DateTime LastReceiveTime { get; set; }
+        internal DateTimeOffset LastReceive { get; set; }
         internal bool IsReceiving { get; set; }
         internal bool IsTransmitting { get; set; }
 
@@ -111,11 +109,11 @@ namespace SockGet.Core
                     while (IsConnected())
                     {
                         IsReceiving = false;
-                        LastReceiveTime = DateTime.Now;
 
                         int count = 0;
                         byte[] buffer = new byte[Header.Size];
                         count = socket.ReadBytes(buffer, 0, Header.Size);
+                        LastReceive = DateTimeOffset.Now;
 
                         IsReceiving = true;
                         if (count == Header.Size)
@@ -210,6 +208,37 @@ namespace SockGet.Core
             }));
         }
 
+        bool HeartbeatListening { get; set; } = false;
+        private void ListenHeartbeat(int interval)
+        {
+            if(!HeartbeatListening)
+            {
+                HeartbeatListening = true;
+                Task.Run(async () =>
+                {
+                    while (IsConnected() && HeartbeatListening)
+                    {
+                        if (!IsReceiving && (DateTimeOffset.Now - LastReceive).TotalMilliseconds > interval )
+                        {
+                            // close connection
+                            Close();
+                        }
+                        await Task.Delay(interval);
+                    }
+                });
+            }else
+            {
+                if(interval <= 0)
+                {
+                    HeartbeatListening = false;
+                }
+            }
+        }
+
+
+
+
+
         private void HandleMessage(Header header, Result received)
         {
             var args = new DataReceivedEventArgs(received, false, null);
@@ -237,8 +266,6 @@ namespace SockGet.Core
                         if (args.Reject || response.IsError)
                         {
                             Authorize(response, false);
-                            // leave loop
-                            break;
                         }
                         else
                         {
@@ -250,7 +277,16 @@ namespace SockGet.Core
                     break;
                 case Token.Heartbeat:
                     {
-                        Task.Run(() => Response(header.id, Data.Response.From(received.Head , null), header.Token,  Status.OK));
+                        Response(header.id, Data.Response.From(received.Head , null), header.Token,  Status.OK);
+
+                        var interval = received.As<int>();
+                        if (interval > 0)
+                        {
+                            ListenHeartbeat(interval);
+                        }else
+                        {
+                            HeartbeatListening = false;
+                        }
                     }
                     break;
                 case Token.Sync:
@@ -312,7 +348,15 @@ namespace SockGet.Core
             header.Type = type;
             Transmit(header, stream);
         }
-        internal void Authorize(Message data, bool accept) => Send(data, Token.Auth, accept ? Status.OK : Status.Error, Enums.Type.Response, 0);
+        internal void Authorize(Message data, bool accept)
+        {
+            Send(data, Token.Auth, accept ? Status.OK : Status.Error, Enums.Type.Response, 0);
+            IsAuthorised = accept;
+            if (!IsAuthorised)
+            {
+                Close();
+            }
+        }
         internal bool Authenticate()
         {
             var body = Serializer.Serialize(tags);
@@ -349,7 +393,7 @@ namespace SockGet.Core
 
             IsAuthorised = tcs.Task.Result;
 
-            if (!IsAuthorised && ThrowExceptionOnAuthFailed)
+            if (!IsAuthorised)
             {
                 throw new AuthorizationException("Authorization is unsuccessful");
             }

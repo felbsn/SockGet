@@ -27,6 +27,41 @@ namespace SockGet.Client
       
         }
 
+        public bool Check(string address, int port)
+        {
+            var ipAddress = IPAddress.Parse(address);
+            Address = address;
+            Port = port;
+
+            socket = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            IPEndPoint localEndPoint = new IPEndPoint(ipAddress, port);
+
+            try
+            {
+                socket.Connect(localEndPoint);
+                socket.Close();
+                socket = null;
+                return true; 
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<bool> CheckAsync(string address, int port, int timeout)
+        {
+            var t = Task.Run(() => Check(address, port));
+            var finished = await Task.Run(() => t.Wait(timeout));
+
+            if (finished)
+                return t.Result;
+            else
+            {
+                Close();
+                return false;
+            }
+        }
         public bool Connect(int port)
         {
             IPHostEntry host = Dns.GetHostEntry("127.0.0.1");
@@ -57,38 +92,11 @@ namespace SockGet.Client
         }
         public bool Reconnect()
         {
-            var ipAddress = IPAddress.Parse(Address);
-            IPEndPoint localEndPoint = new IPEndPoint(ipAddress, Port);
-            socket = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-
-            try
-            {
-                socket.Connect(localEndPoint);
-            }
-            catch (Exception ex)
-            {
-                return false;
-            }
-
-            Listen();
-            return Authenticate();
+            return Connect(Address, Port);
         }
         public async Task<bool> ReconnectAsync(int timeout)
         {
-            if (timeout == 0)
-                return Reconnect();
-
-            var sw = new System.Diagnostics.Stopwatch();
-            sw.Start();
-
-            bool connected = false;
-
-            while (!connected && (timeout == int.MaxValue || (sw.ElapsedMilliseconds < timeout)))
-            {
-                connected = Reconnect();
-                await Task.Delay(500);
-            }
-            return connected;
+            return await ConnectAsync(Address, Port, timeout);
         }
         public async Task<bool> ConnectAsync(int port, int timeout = 2000)
         {
@@ -102,35 +110,32 @@ namespace SockGet.Client
             if (timeout == 0)
                 return await Task.Run(() => Connect(address, port));
 
-            var sw = new System.Diagnostics.Stopwatch();
-            sw.Start();
+            var time = DateTimeOffset.Now;
+
             bool connected = false;
-
-            while (!connected && (timeout == -1 || (sw.ElapsedMilliseconds < timeout)))
+            while (!connected && (timeout == -1 || ((DateTimeOffset.Now - time).TotalMilliseconds < timeout)))
             {
-                connected = await Task.Run(() =>
-                {
-                    var t = Task.Run(() => Connect(address, port));
+                var elapsed = (DateTimeOffset.Now - time).TotalMilliseconds;
 
-                    try
+                var t = Task.Run(() => Connect(address, port));
+
+
+                    var finished = await Task.WhenAny(t, Task.Delay(timeout == -1 ? int.MaxValue : timeout - (int)elapsed));
+                    if (finished == t)
                     {
-                        if (t.Wait(timeout == -1 ? timeout : timeout - (int)sw.ElapsedMilliseconds))
-                        {
-                            return t.Result;
-                        }
-                        else
-                        {
-                            socket.Close();
-                            return false;
-                        };
+                        if (t.IsFaulted)
+                            throw t.Exception.InnerException ?? t.Exception;
+
+                        return t.Result;
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        throw ex.InnerException ?? ex;
+                        socket.Close();
+                        throw new ConnectionTimeoutException("Connection timed out.");
                     }
-                });
+
           
-                if(!connected && (timeout == -1 || 500 < timeout - sw.ElapsedMilliseconds))
+                if(!connected && (timeout == -1 || 500 < (DateTimeOffset.Now - time).TotalMilliseconds))
                     await Task.Delay(500);
             }
             return connected;
