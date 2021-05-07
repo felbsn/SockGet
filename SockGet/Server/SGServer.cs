@@ -24,9 +24,9 @@ namespace SockGet.Server
         Socket socket;
         List<SGSocket> clients;
 
-        public bool UseHeartbeat { get; set; } = true;
-        public int HeartbeatInterval { get; set; } = 2000;
-        public int HeartbeatTimeout { get; set; } = 2000;
+        public bool UseHeartbeat { get; set; } = false;
+        public int HeartbeatInterval { get; set; } = 5000;
+        public int HeartbeatTimeout { get; set; } = 1000;
 
         public IReadOnlyList<SGSocket> Clients => clients;
 
@@ -139,8 +139,7 @@ namespace SockGet.Server
                        var current = clients.ToArray();
                        foreach (var client in current)
                        {
-
-                           if (!client.IsReceiving && (DateTime.Now - client.LastReceiveTime).TotalMilliseconds > 1000)
+                           if (!client.IsReceiving && (DateTime.Now - client.LastReceiveTime).TotalMilliseconds > HeartbeatInterval)
                            {
                                 try
                                 {

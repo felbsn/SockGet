@@ -31,7 +31,7 @@ namespace SockGet.Core
         public string AuthToken { get;  set; }
         public void Close(int timeout = 0)
         {
-            socket.Close(timeout);
+            socket?.Close(timeout);
             socket = null;
         }
         public bool IsConnected()

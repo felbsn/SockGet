@@ -112,15 +112,22 @@ namespace SockGet.Client
                 {
                     var t = Task.Run(() => Connect(address, port));
 
-                    if (t.Wait(timeout == -1 ? timeout : timeout - (int)sw.ElapsedMilliseconds))
+                    try
                     {
-                        return t.Result;
+                        if (t.Wait(timeout == -1 ? timeout : timeout - (int)sw.ElapsedMilliseconds))
+                        {
+                            return t.Result;
+                        }
+                        else
+                        {
+                            socket.Close();
+                            return false;
+                        };
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        socket.Close();
-                        return false;
-                    };
+                        throw ex.InnerException ?? ex;
+                    }
                 });
           
                 if(!connected && (timeout == -1 || 500 < timeout - sw.ElapsedMilliseconds))
