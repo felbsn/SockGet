@@ -52,14 +52,16 @@ namespace SockGet.Client
         public async Task<bool> CheckAsync(string address, int port, int timeout)
         {
             var t = Task.Run(() => Check(address, port));
-            var finished = await Task.Run(() => t.Wait(timeout));
-
-            if (finished)
+            var finsihed = await Task.WhenAny(t, Task.Delay(timeout));
+            if(finsihed == t)
+            {
+                if (t.IsFaulted)
+                    throw t.Exception.InnerException ?? t.Exception;
                 return t.Result;
-            else
+            }else
             {
                 Close();
-                return false;
+                throw new ConnectionTimeoutException("Connection timed out.");
             }
         }
         public bool Connect(int port)
@@ -110,35 +112,20 @@ namespace SockGet.Client
             if (timeout == 0)
                 return await Task.Run(() => Connect(address, port));
 
-            var time = DateTimeOffset.Now;
-
-            bool connected = false;
-            while (!connected && (timeout == -1 || ((DateTimeOffset.Now - time).TotalMilliseconds < timeout)))
+            var t = Task.Run(() => Connect(address, port));
+            var finished = await Task.WhenAny(t, Task.Delay(timeout));
+            if (finished == t)
             {
-                var elapsed = (DateTimeOffset.Now - time).TotalMilliseconds;
+                if (t.IsFaulted)
+                    throw t.Exception.InnerException ?? t.Exception;
 
-                var t = Task.Run(() => Connect(address, port));
-
-
-                    var finished = await Task.WhenAny(t, Task.Delay(timeout == -1 ? int.MaxValue : timeout - (int)elapsed));
-                    if (finished == t)
-                    {
-                        if (t.IsFaulted)
-                            throw t.Exception.InnerException ?? t.Exception;
-
-                        return t.Result;
-                    }
-                    else
-                    {
-                        socket.Close();
-                        throw new ConnectionTimeoutException("Connection timed out.");
-                    }
-
-          
-                if(!connected && (timeout == -1 || 500 < (DateTimeOffset.Now - time).TotalMilliseconds))
-                    await Task.Delay(500);
+                return t.Result;
             }
-            return connected;
+            else
+            {
+                socket.Close();
+                throw new ConnectionTimeoutException("Connection timed out.");
+            }
         }
 
         internal SGClient(Socket socket)
