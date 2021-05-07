@@ -6,13 +6,9 @@ using System.Threading.Tasks;
 
 namespace SockGet.Core.Enums
 {
-    [Flags]
-    internal enum Token 
+    internal enum Status
     {
-        Message,
-        Auth,
-        Tag,
-        Heartbeat,
-        Sync
+        OK,
+        Error,
     }
 }

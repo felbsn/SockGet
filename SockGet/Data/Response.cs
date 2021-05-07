@@ -64,9 +64,8 @@ namespace SockGet.Data
             return res;
         }
 
-         
 
-        public static readonly Response Empty  = new Response() { };
+        public static Response Empty  => new Response() { };
 
         public bool IsError { get; internal set; }
     }

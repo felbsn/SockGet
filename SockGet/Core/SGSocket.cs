@@ -47,8 +47,6 @@ namespace SockGet.Core
         public Task<Result> RequestAsync(string action, string content, int timeout = -1) => Task.Run(() => Request(action, content , timeout));
         public Task<string> RequestTagAsync(string tagName, int timeout = -1) => Task.Run(() => RequestTag(tagName ));
 
-
-
         public void Message(string action, string content)
         {
             Send(new Message()
@@ -57,39 +55,52 @@ namespace SockGet.Core
                 Body = content
             }, Token.Message);
         }
-        public void SyncTags()
-        {
-            Send(Data.Message.Create("tags" ,Tags), Token.Message);
-        }
         public Result Request(string action, string content ,int timeout = -1)
         {
             return Request(new Message()
             {
                 Head = action,
                 Body = content
-            },Token.Request , timeout);
+            },Token.Message , timeout);
         }
+
+
         public string RequestTag(string tagName ,int timeout = -1)
         {
             return Request(new Message()
             {
                 Head = tagName,
             },
-            Token.TagRequest , timeout).Head;
+            Token.Tag , timeout).Head;
         }
+        public bool Heartbeat(string echo, int timeout = -1)
+        {
+            return Request(new Message()
+            {
+                Head = echo,
+            },
+            Token.Heartbeat, timeout)?.Head == echo;
+        }
+
+
+
 
         protected Socket socket;
         protected SGSocket()
         {
-            pending = new Dictionary<byte, TaskCompletionSource<Result>>();
+            pending = new Dictionary<uint, TaskCompletionSource<Result>>();
             tags = new Dictionary<string, string>();
         }
   
-        int counter;
+        long counter;
         Dictionary<string, string> tags;
-        Dictionary<byte, TaskCompletionSource<Result>> pending;
+        Dictionary<uint, TaskCompletionSource<Result>> pending;
 
         internal event EventHandler<AuthRequestedEventArgs> AuthRequested;
+
+        internal DateTime LastReceiveTime { get; set; }
+        internal bool IsReceiving { get; set; }
+        internal bool IsTransmitting { get; set; }
 
         internal void Listen()
         {
@@ -99,37 +110,20 @@ namespace SockGet.Core
                 {
                     while (IsConnected())
                     {
+                        IsReceiving = false;
+                        LastReceiveTime = DateTime.Now;
+
                         int count = 0;
-                        byte[] buffer = new byte[10];
+                        byte[] buffer = new byte[Header.Size];
+                        count = socket.ReadBytes(buffer, 0, Header.Size);
 
-                        var recvTcs = new TaskCompletionSource<bool>();
-                        socket.BeginReceive(buffer, 0, 10, SocketFlags.None, (asyn) => {
-                            try
-                            {
-                                int iRx = socket.EndReceive(asyn);
-                                count = iRx;
-                                recvTcs.SetResult(iRx == 10);
-                            }
-                            catch (SocketException ex)
-                            {
-                                count = 0;
-                                recvTcs.SetResult(false);
-                            }
-                        }, null);
-
-                        recvTcs.Task.Wait();
-                        if (recvTcs.Task.Result == false)
-                            throw new Exception("olmadi");
-
-
-                        //var count = socket.Receive(buffer, 10, SocketFlags.None);
-                        if (count == 10)
+                        IsReceiving = true;
+                        if (count == Header.Size)
                         {
                             var header = Header.Parse(buffer);
-                            //if (header.version == 1)
+                            if (header.version == 1 )
                             {
                                 var token = (Token)header.token;
-
 
                                 socket.ReadBytes(header.infoLength, out var infoBuffer);
                                 socket.ReadBytes(header.headLength, out var headBuffer);
@@ -144,7 +138,7 @@ namespace SockGet.Core
 
                                 if(sgstream.CanRead)
                                 {
-                                    if (Receiver != null && (token == Token.Message || token == Token.Request || token == Token.Response))
+                                    if (Receiver != null && (token == Token.Message))
                                     {
                                         Receiver?.Invoke(head, info, sgstream);
                                         sgstream.FinishRead();
@@ -158,85 +152,29 @@ namespace SockGet.Core
 
                                 var received = new Result(head, body, info, obj);
 
-                                switch (token)
+                                switch (header.Type)
                                 {
-                                    case Token.AuthRequest:
-                                        {
-                                            tags = Serializer.Deserialize<Dictionary<string, string>>(body);
-
-                                            var args = new AuthRequestedEventArgs(head);
-                                            AuthRequested?.Invoke(this, args);
-
-                                            var response = args.Response ?? Data.Response.Empty;
-                                            if (args.Reject || response.IsError)
-                                            {
-                                                Authorize(response, false);
-                                                // leave loop
-                                                break;
-                                            }
-                                            else
-                                            {
-                                                Authorize(response, true);
-                                            }
-                                        }
+                                    case Enums.Type.Message:
+                                        HandleMessage(header, received);
                                         break;
-                                    case Token.AuthResponse:
-                                        {
-                                            var reject = header.id == 0;
-                                            var args = new AuthRespondEventArgs(head, body, reject);
-                                            AuthRespond?.Invoke(this, args);
-                                        }
+                                    case Enums.Type.Request:
+                                        HandleRequest(header, received);
                                         break;
-                                    case Token.Message:
-                                        {
-                                            var args = new DataReceivedEventArgs(received, false, null);
-                                            Task.Run(() => DataReceived?.Invoke(this, args));
-                                        }
-                                        break;
-                                    case Token.Request:
-                                        {
-                                            var args = new DataReceivedEventArgs(received, true, Data.Response.Empty);
-                                            Task.Run(() => DataReceived?.Invoke(this, args))
-                                            .ContinueWith(t => Response(header.id, args.Response));
-                                        }
-                                        break;
-                                    case Token.Response:
-                                        {
-                                            if (pending.TryGetValue(header.id, out var tcs))
-                                            {
-                                                tcs.SetResult(received);
-                                                pending.Remove(header.id);
-                                            }
-                                            else
-                                            {
-                                                throw new Exception("Unable to find pending response task!");
-                                            }
-                                        }
-                                        break;
-                                    case Token.TagRequest:
-
-                                        if (!Tags.TryGetValue(head, out var value))
-                                            value = null;
-                                        Response(header.id, Data.Message.Create(head, value));
-                                        break;
-
-                                    case Token.TagSync:
-                                        {
-                                            var tags = received.As<Dictionary<string, string>>();
-                                            foreach (var pair in tags)
-                                            {
-                                                this.tags[pair.Key] = pair.Value;
-                                            }
-                                        }
+                                    case Enums.Type.Response:
+                                        HandleResponse(header, received);
                                         break;
                                     default:
-                                        throw new Exception("Unsupported Token " + token.ToString());
+                                        break;
                                 }
+                            }else
+                            {
+                                throw new UnsupportedVersionException("Unsupported SG version !");
                             }
                         }
                         else
                         {
                             Close();
+                            throw new HeaderReceiveException("Header byte count corrupt.");
                         }
                     }
                 }
@@ -271,10 +209,89 @@ namespace SockGet.Core
                 }
             }));
         }
+
+        private void HandleMessage(Header header, Result received)
+        {
+            var args = new DataReceivedEventArgs(received, false, null);
+            Task.Run(() => DataReceived?.Invoke(this, args));
+        }
+        private void HandleRequest(Header header, Result received)
+        {
+            switch (header.Token)
+            {
+                case Token.Message:
+                    {
+                        var args = new DataReceivedEventArgs(received, true, Data.Response.Empty);
+                        Task.Run(() => DataReceived?.Invoke(this, args))
+                            .ContinueWith(t => Response(header.id, args.Response, header.Token, args.Response?.IsError == true ? Status.Error : Status.OK));
+                    }
+                    break;
+                case Token.Auth:
+                    {
+                        tags = received.As<Dictionary<string, string>>();
+
+                        var args = new AuthRequestedEventArgs(received.Head);
+                        AuthRequested?.Invoke(this, args);
+
+                        var response = args.Response ?? Data.Response.Empty;
+                        if (args.Reject || response.IsError)
+                        {
+                            Authorize(response, false);
+                            // leave loop
+                            break;
+                        }
+                        else
+                        {
+                            Authorize(response, true);
+                        }
+                    }
+                    break;
+                case Token.Tag:
+                    break;
+                case Token.Heartbeat:
+                    {
+                        Task.Run(() => Response(header.id, Data.Response.From(received.Head , null), header.Token,  Status.OK));
+                    }
+                    break;
+                case Token.Sync:
+                    break;
+                default:
+                    break;
+            }
+        }
+        private void HandleResponse(Header header, Result received)
+        {
+            var args = new DataReceivedEventArgs(received, false, null);
+            switch (header.Token)
+            {
+                case Token.Auth:
+                    {
+                        AuthRespond?.Invoke(this, new AuthRespondEventArgs(received.Head, received.Body, header.Status != Status.OK));
+                    }
+                    break;
+                default:
+                    DispatchResult(header.id, received);
+                    break;
+            }
+        }
+        private void DispatchResult(uint id , Result received)
+        {
+            if (pending.TryGetValue(id, out var tcs))
+            {
+                tcs.SetResult(received);
+                pending.Remove(id);
+            }
+            else
+            {
+                throw new Exception("Unable to find pending response task!");
+            }
+        }
+
         internal void Transmit(Header header, Stream stream)
         {
             lock (socket)
             {
+                IsTransmitting = true;
                 socket.Send(header.GetBytes());
 
                 int read;
@@ -283,16 +300,19 @@ namespace SockGet.Core
                 {
                     socket.Send(buffer ,  read , SocketFlags.None);
                 }
+                IsTransmitting = false;
             }
         }
-        internal void Authorize(Message data , bool accept )
+        internal void Send(Message message, Token token = Token.Message, Status status = Status.OK, Enums.Type type = Enums.Type.Message , uint id = 0)
         {
-            var stream = data.GetStream(out var header);
-
-            header.token = (byte)Token.AuthResponse;
-            header.id = (byte)(accept ? 1 : 0);
+            var stream = message.GetStream(out var header);
+            header.id = id;
+            header.Token = token;
+            header.Status = status;
+            header.Type = type;
             Transmit(header, stream);
         }
+        internal void Authorize(Message data, bool accept) => Send(data, Token.Auth, accept ? Status.OK : Status.Error, Enums.Type.Response, 0);
         internal bool Authenticate()
         {
             var body = Serializer.Serialize(tags);
@@ -314,21 +334,18 @@ namespace SockGet.Core
 
                 AuthRespond -= authRespondEvent;
             };
-            AuthRespond += authRespondEvent;
 
-            var stream = msg.GetStream(out var header);
-            header.token = (byte)Token.AuthRequest;
-            Transmit(header, stream);
+            AuthRespond += authRespondEvent;
 
             try
             {
+                Send( msg, Token.Auth, Status.OK, Enums.Type.Request, 0);
                 tcs.Task.Wait();
             }
             catch (Exception)
             {
                 return false;
             }
-
 
             IsAuthorised = tcs.Task.Result;
 
@@ -341,45 +358,26 @@ namespace SockGet.Core
 
             return IsAuthorised;
         }
-        internal void Send(Message message, Token token)
+        internal Result Request(Message message ,Token token, int timeout = -1)
         {
-            var stream = message.GetStream(out var header);
-            header.token = (byte)token;
-            Transmit(header, stream);
-        }
-        internal void Response(byte id , Message message)
-        {
-            var stream = message.GetStream(out var header);
-            header.id = id;
-            header.token = (byte)Token.Response;
-            Transmit(header, stream);
-        }
-        internal Result Request(Message message ,Token token, int timeout)
-        {
-            byte id = (byte)Interlocked.Increment(ref counter);
+            var id =  (uint)Interlocked.Increment(ref counter);
 
             var tcs = new TaskCompletionSource<Result>();
             pending.Add(id, tcs);
 
-            var stream = message.GetStream(out var header);
-            header.id = id;
-            header.token = (byte)token;
-            Transmit(header, stream);
+            Send(message, token, Status.OK, Enums.Type.Request , id);
 
             var task = tcs.Task;
             try
             {
-                task.Wait(timeout);
-
-                if (task.IsCompleted)
-                    return task.Result;
-                else
-                    return null;
+                return task.Wait(timeout) ? task.Result : null;
             }
             catch (Exception ex)
             {
                 return null;
             }
         }
+        internal void Response(uint id, Message message, Token token, Status status) => Send(message, token, status, Enums.Type.Response, id);
+
     }
 }

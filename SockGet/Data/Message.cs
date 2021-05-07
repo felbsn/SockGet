@@ -32,20 +32,13 @@ namespace SockGet.Data
             set => body = string.IsNullOrEmpty(value) ? null : new MemoryStream(Encoding.UTF8.GetBytes(value));
         }
  
-        public static Message Create(string head , object body)
-        {
-            var msg = new Message();
-
-            msg.Load(head, body);
-
-
-            return msg;
-        }
-
         internal void Load(string head , object body)
         {
             Head = head;
-
+            if(body == null)
+            {
+                Body = "";
+            }else
             if (body is string)
             {
                 Info = "@string";

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SockGet.Core.Enums;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,50 +9,42 @@ namespace SockGet.Core
 {
     public struct Header
     {
-        public static readonly byte CurrentVersion = 1;
+        public static byte CurrentVersion => 1;
+        public static int Size => 16;
 
-        public byte version;
-        public byte token;
-        public byte id;
-        public byte infoLength;
-        public ushort  headLength;
+        internal Token Token { get => (Token)token; set => token = (byte) value; }
+        internal Enums.Type Type { get => (Enums.Type)type; set => type = (byte)value; }
+        internal Enums.Status Status { get => (Enums.Status)status; set => status = (byte)value; }
+
+
+        public byte version; 
+        public byte token; 
+        public byte type; 
+        public byte status;
+
+        public uint id; 
+
+        public ushort infoLength; 
+        public ushort  headLength; 
         public int bodyLength;
+
+        
 
         public byte[] GetBytes()
         {
-            var bytes = new byte[10];
+            var bytes = new byte[Size];
+
             bytes[0] = version;
             bytes[1] = token;
-            bytes[2] = id;
-            bytes[3] = infoLength;
+            bytes[2] = type;
+            bytes[3] = status;
 
-            Array.Copy(BitConverter.GetBytes(headLength), 0, bytes, 4, 2);
-            Array.Copy(BitConverter.GetBytes(bodyLength), 0, bytes, 6, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes(id), 0, bytes, 4, 4);
+            Buffer.BlockCopy(BitConverter.GetBytes(infoLength), 0, bytes, 8, 2);
+            Buffer.BlockCopy(BitConverter.GetBytes(headLength), 0, bytes, 10, 2);
+            Buffer.BlockCopy(BitConverter.GetBytes(bodyLength), 0, bytes, 12, 4);
 
             return bytes;
-        }
-        public static bool TryParse(byte[] bytes , out Header messageHeader)
-        {
-            if(bytes.Length == 64)
-            {
-                messageHeader = new Header();
-
-
-                messageHeader.version = bytes[0];
-                messageHeader.token = bytes[1];
-                messageHeader.id = bytes[2];
-                messageHeader.infoLength = bytes[3];
-
-                messageHeader.headLength =  BitConverter.ToUInt16(bytes, 4);
-                messageHeader.bodyLength =  BitConverter.ToInt32(bytes, 6);
-
-                return true;
-            }
-            else
-            {
-                messageHeader = default;
-                return false;
-            }
         }
         public static Header Parse(byte[] bytes)
         {
@@ -59,11 +52,13 @@ namespace SockGet.Core
 
                 messageHeader.version = bytes[0];
                 messageHeader.token = bytes[1];
-                messageHeader.id = bytes[2];
-                messageHeader.infoLength = bytes[3];
+                messageHeader.type = bytes[2];
+                messageHeader.status = bytes[3];
 
-                messageHeader.headLength = BitConverter.ToUInt16(bytes, 4);
-                messageHeader.bodyLength = BitConverter.ToInt32(bytes, 6);
+                messageHeader.id = BitConverter.ToUInt32(bytes, 4);
+                messageHeader.infoLength = BitConverter.ToUInt16(bytes, 8);
+                messageHeader.headLength = BitConverter.ToUInt16(bytes, 10);
+                messageHeader.bodyLength = BitConverter.ToInt32(bytes, 12);
 
                 return messageHeader;
         }

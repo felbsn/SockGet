@@ -24,9 +24,9 @@ namespace SockGet.Server
         Socket socket;
         List<SGSocket> clients;
 
-        public bool KeepAlive { get; set; } = true;
-        public uint KeepAliveInterval { get; set; } = 1000;
-        public uint KeepAliveTime { get; set; } = 1000;
+        public bool UseHeartbeat { get; set; } = true;
+        public int HeartbeatInterval { get; set; } = 2000;
+        public int HeartbeatTimeout { get; set; } = 2000;
 
         public IReadOnlyList<SGSocket> Clients => clients;
 
@@ -50,11 +50,14 @@ namespace SockGet.Server
             socket.Bind(localEndPoint);
             Accept();
             Started?.Invoke(this, EventArgs.Empty);
+
+            if (UseHeartbeat)
+                HeartBeatRunner();
         }
 
         void Accept()
         {
-            Task.Run((Action)(() =>
+            Task.Run((() =>
             {
                 try
                 {
@@ -62,31 +65,42 @@ namespace SockGet.Server
                     {
                         socket.Listen(1);
                         var sock = socket.Accept();
-                        if (KeepAlive)
-                            SetKeepAlive(KeepAlive, KeepAliveTime, KeepAliveInterval);
 
-                        var client = new SGClient(sock);
-                        client.AuthRequested += (s, e) =>
+                        lock(this)
                         {
-                            var args = new ClientAuthRequestedEventArgs(client, e.AuthToken , e.Response);
-                            ClientAuthRequested?.Invoke(this , args);
-
-                            e.Response = args.Response;
-                            e.Reject = args.Reject || (args.Response != null && args.Response.IsError);
-                            if(!e.Reject)
+                            var client = new SGClient(sock);
+                            client.AuthRequested += (s, e) =>
                             {
-                          
+                                var args = new ClientAuthRequestedEventArgs(client, e.AuthToken, e.Response);
+                                ClientAuthRequested?.Invoke(this, args);
 
-                                client.Disconnected += (s1, e1) =>
+                                e.Response = args.Response;
+                                e.Reject = args.Reject || (args.Response != null && args.Response.IsError);
+                                if (!e.Reject)
                                 {
-                                    clients.Remove(client);
-                                    ClientDisconnected?.Invoke(this, new ClientConnectionEventArgs(client));
-                                };
-                                clients.Add(client);
-                                ClientConnected?.Invoke(this, new ClientConnectionEventArgs(client));
-                            }
-                        };
-                        client.Listen();
+
+
+                                    client.Disconnected += (s1, e1) =>
+                                    {
+                                        lock (this)
+                                        {
+                                            clients.Remove(client);
+                                        }
+
+                                        ClientDisconnected?.Invoke(this, new ClientConnectionEventArgs(client));
+                                    };
+
+                                    lock (this)
+                                    {
+                                        clients.Add(client);
+                                    }
+
+                              
+                                    ClientConnected?.Invoke(this, new ClientConnectionEventArgs(client));
+                                }
+                            };
+                            client.Listen();
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -110,6 +124,50 @@ namespace SockGet.Server
                     clients.Clear();
                 }
             }));
+        }
+
+        void HeartBeatRunner()
+        {
+            Task.Run(async () =>
+            {
+                try
+                {
+                    while(socket.IsBound)
+                    {
+                        await Task.Delay(HeartbeatInterval);
+
+                       var current = clients.ToArray();
+                       foreach (var client in current)
+                       {
+
+                           if (!client.IsReceiving && (DateTime.Now - client.LastReceiveTime).TotalMilliseconds > 1000)
+                           {
+                                try
+                                {
+                                    bool alive = client.Heartbeat(DateTime.Now.ToString(), HeartbeatTimeout);
+
+                                    if (!alive)
+                                    {
+                                        client.Close();
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    _ = ex;
+                                }
+                           }
+                       }
+                        
+         
+                    }
+                }
+                catch (Exception)
+                {
+
+                    throw;
+                }
+            });
+
         }
 
         void SetKeepAlive(bool on, uint keepAliveTime, uint keepAliveInterval)
