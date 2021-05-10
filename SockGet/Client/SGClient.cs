@@ -32,6 +32,7 @@ namespace SockGet.Client
             var ipAddress = IPAddress.Parse(address);
             Address = address;
             Port = port;
+            CloseReason = null;
 
             socket = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             IPEndPoint localEndPoint = new IPEndPoint(ipAddress, port);

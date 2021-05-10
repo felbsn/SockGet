@@ -87,7 +87,7 @@ namespace SockGet.Server
                                             clients.Remove(client);
                                         }
 
-                                        ClientDisconnected?.Invoke(this, new ClientConnectionEventArgs(client));
+                                        ClientDisconnected?.Invoke(this, new ClientConnectionEventArgs(client , e1.Reason));
                                     };
 
                                     lock (this)
@@ -150,13 +150,15 @@ namespace SockGet.Server
                            {
                                 try
                                 {
-                                    var interval = HeartbeatInterval + HeartbeatTimeout;
-                                    bool alive = client.Heartbeat(DateTime.Now.ToString(), interval,  HeartbeatTimeout);
-
-                                    if (!alive)
+                                    Task.Run(() =>
                                     {
-                                        client.Close();
-                                    }
+                                        var interval = HeartbeatInterval + HeartbeatTimeout;
+                                        bool alive = client.Heartbeat(DateTime.Now.ToString(), interval, HeartbeatTimeout);
+                                        if (!alive)
+                                        {
+                                            client.Close(0, "No heartbeat response received");
+                                        }
+                                    });
                                 }
                                 catch (Exception ex)
                                 {

@@ -22,14 +22,15 @@ namespace SockGet.Core
         public event EventHandler<DataReceivedEventArgs> DataReceived;
         public event EventHandler<AuthRespondEventArgs> AuthRespond;
         public event EventHandler Connected;
-        public event EventHandler Disconnected;
+        public event EventHandler<DisconnectedEventArgs> Disconnected;
 
         public bool IsAuthorised { get;  protected set; }
         public Dictionary<string, string> Tags => tags;
         public DataReceiver Receiver { get; set; }
         public string AuthToken { get;  set; }
-        public void Close(int timeout = 0)
+        public void Close(int timeout = 0 , string reason = null)
         {
+            CloseReason = reason;
             socket?.Close(timeout);
             socket = null;
         }
@@ -81,21 +82,20 @@ namespace SockGet.Core
         }
 
 
-
-
         protected Socket socket;
         protected SGSocket()
         {
             pending = new Dictionary<uint, TaskCompletionSource<Result>>();
             tags = new Dictionary<string, string>();
         }
-  
-        long counter;
-        Dictionary<string, string> tags;
-        Dictionary<uint, TaskCompletionSource<Result>> pending;
 
         internal event EventHandler<AuthRequestedEventArgs> AuthRequested;
 
+        long counter;
+        Dictionary<uint, TaskCompletionSource<Result>> pending;
+        Dictionary<string, string> tags;
+
+        internal string CloseReason;
         internal DateTimeOffset LastReceive { get; set; }
         internal bool IsReceiving { get; set; }
         internal bool IsTransmitting { get; set; }
@@ -191,8 +191,7 @@ namespace SockGet.Core
 
                     if (IsAuthorised)
                     {
-
-                        Disconnected?.Invoke(this, EventArgs.Empty);
+                        Disconnected?.Invoke(this, new DisconnectedEventArgs(CloseReason));
                     }
                     else
                     {
@@ -220,8 +219,9 @@ namespace SockGet.Core
                     {
                         if (!IsReceiving && (DateTimeOffset.Now - LastReceive).TotalMilliseconds > interval )
                         {
+                            Console.WriteLine("Heartbeat ratio exceeded.");
                             // close connection
-                            Close();
+                            Close( 0 , "No heartbeat signal received from server.");
                         }
                         await Task.Delay(interval);
                     }

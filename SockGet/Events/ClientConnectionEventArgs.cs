@@ -8,13 +8,12 @@ using System.Threading.Tasks;
 
 namespace SockGet.Events
 {
-    public class ClientConnectionEventArgs : EventArgs
+    public class ClientConnectionEventArgs : DisconnectedEventArgs
     {
-        public ClientConnectionEventArgs(SGClient client)
+        public ClientConnectionEventArgs(SGClient client , string reason = null) : base(reason)
         {
             Client = client;
         }
-
         public SGClient Client { get; }
     }
 }
