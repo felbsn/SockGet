@@ -25,8 +25,8 @@ namespace SockGet.Server
         List<SGSocket> clients;
 
         public bool UseHeartbeat { get; set; } = false;
-        public int HeartbeatInterval { get; set; } = 5000;
-        public int HeartbeatTimeout { get; set; } = 1000;
+        public int HeartbeatInterval { get; set; } = 10_000;
+        public int HeartbeatTimeout { get; set; } = 5_000;
 
         public int AuthenticationTimeout { get; set; } = 2000;
 

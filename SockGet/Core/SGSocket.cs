@@ -220,9 +220,9 @@ namespace SockGet.Core
                 {
                     while (IsConnected() && HeartbeatListening)
                     {
+
                         if (!IsReceiving && (DateTimeOffset.Now - LastReceive).TotalMilliseconds > interval )
                         {
-                            Console.WriteLine("Heartbeat ratio exceeded.");
                             // close connection
                             Close( 0 , "No heartbeat signal received from server.");
                         }
