@@ -135,66 +135,35 @@ namespace SockGet.Server
 
         void HeartBeatRunner()
         {
-            Task.Run(async () =>
+            var timer = new System.Timers.Timer();
+            timer.AutoReset = true;
+            timer.Interval = HeartbeatInterval;
+            timer.Elapsed += (s, e) =>
             {
-                try
+                var current = clients.ToArray();
+                foreach (var client in current)
                 {
-                    while(socket != null && socket.IsBound && UseHeartbeat)
+                    try
                     {
-                       await Task.Delay(HeartbeatInterval);
-
-                       var current = clients.ToArray();
-                       foreach (var client in current)
-                       {
-                            try
-                            {
-                                if(!client.IsTransmitting)
-                                {
-                                    Task.Run(() =>
-                                    {
-                                        bool alive = client.Heartbeat(DateTime.Now.ToString(), HeartbeatInterval, HeartbeatTimeout);
-                                        if (!alive)
-                                        {
-                                            client.Close(0, "No heartbeat response received");
-                                        }
-                                    });
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                _ = ex;
-                            }
-                       }
-                    }
-
-                    if(socket != null && socket.IsBound && !UseHeartbeat)
-                    {
-                        var current = clients.ToArray();
-                        foreach (var client in current)
+                        if (!client.IsTransmitting)
                         {
-                            try
+                            Task.Run(() =>
                             {
-                                bool alive = client.Heartbeat(DateTime.Now.ToString(), 0 ,  HeartbeatTimeout);
-
+                                bool alive = client.Heartbeat(DateTime.Now.ToString(), HeartbeatInterval, HeartbeatTimeout);
                                 if (!alive)
-                                {
-                                    client.Close();
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                _ = ex;
-                            }
+                                    client.Close(0, "No heartbeat response received");
+                                
+                            });
                         }
                     }
+                    catch (Exception ex)
+                    {
+                        _ = ex;
+                    }
                 }
-                catch (Exception)
-                {
-
-                    throw;
-                }
-            });
-
+            };
+            Stopped += (s, e) => timer.Stop();
+            timer.Start();
         }
     }
 }

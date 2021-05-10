@@ -256,11 +256,10 @@ namespace SockGet.Core
                             Close(0, "No heartbeat signal received from server.");
                         }
 
-                        t.Interval = interval - (int)(diff.Milliseconds * 0.1);
+                        t.Interval = interval - (int)(diff.Milliseconds );
                     }
                     else
                         t.Interval = interval;
-  
                 };
 
                 Disconnected += (s, e) =>
