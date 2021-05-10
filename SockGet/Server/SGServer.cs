@@ -146,25 +146,24 @@ namespace SockGet.Server
                        var current = clients.ToArray();
                        foreach (var client in current)
                        {
-                           if (!client.IsReceiving && (DateTime.Now - client.LastReceive).TotalMilliseconds > HeartbeatInterval)
-                           {
-                                try
+                            try
+                            {
+                                if(!client.IsTransmitting)
                                 {
                                     Task.Run(() =>
                                     {
-                                        var interval = HeartbeatInterval + HeartbeatTimeout;
-                                        bool alive = client.Heartbeat(DateTime.Now.ToString(), interval, HeartbeatTimeout);
+                                        bool alive = client.Heartbeat(DateTime.Now.ToString(), HeartbeatInterval, HeartbeatTimeout);
                                         if (!alive)
                                         {
                                             client.Close(0, "No heartbeat response received");
                                         }
                                     });
                                 }
-                                catch (Exception ex)
-                                {
-                                    _ = ex;
-                                }
-                           }
+                            }
+                            catch (Exception ex)
+                            {
+                                _ = ex;
+                            }
                        }
                     }
 
@@ -173,21 +172,18 @@ namespace SockGet.Server
                         var current = clients.ToArray();
                         foreach (var client in current)
                         {
-                            if (!client.IsReceiving && (DateTime.Now - client.LastReceive).TotalMilliseconds > HeartbeatInterval)
+                            try
                             {
-                                try
-                                {
-                                    bool alive = client.Heartbeat(DateTime.Now.ToString(), 0 ,  HeartbeatTimeout);
+                                bool alive = client.Heartbeat(DateTime.Now.ToString(), 0 ,  HeartbeatTimeout);
 
-                                    if (!alive)
-                                    {
-                                        client.Close();
-                                    }
-                                }
-                                catch (Exception ex)
+                                if (!alive)
                                 {
-                                    _ = ex;
+                                    client.Close();
                                 }
+                            }
+                            catch (Exception ex)
+                            {
+                                _ = ex;
                             }
                         }
                     }

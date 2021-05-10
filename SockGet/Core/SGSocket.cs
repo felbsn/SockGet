@@ -24,11 +24,11 @@ namespace SockGet.Core
         public event EventHandler Connected;
         public event EventHandler<DisconnectedEventArgs> Disconnected;
 
-        public bool IsAuthorised { get;  protected set; }
+        public bool IsAuthorised { get; protected set; }
         public Dictionary<string, string> Tags => tags;
         public DataReceiver Receiver { get; set; }
-        public string AuthToken { get;  set; }
-        public void Close(int timeout = 0 , string reason = null)
+        public string AuthToken { get; set; }
+        public void Close(int timeout = 0, string reason = null)
         {
             CloseReason = reason;
             socket?.Close(timeout);
@@ -44,8 +44,8 @@ namespace SockGet.Core
             get => Tags.TryGetValue(key, out var value) ? value : null;
         }
 
-        public Task<Result> RequestAsync(string action, string content, int timeout = -1) => Task.Run(() => Request(action, content , timeout));
-        public Task<string> RequestTagAsync(string tagName, int timeout = -1) => Task.Run(() => RequestTag(tagName ));
+        public Task<Result> RequestAsync(string action, string content, int timeout = -1) => Task.Run(() => Request(action, content, timeout));
+        public Task<string> RequestTagAsync(string tagName, int timeout = -1) => Task.Run(() => RequestTag(tagName));
 
         public void Message(string action, string content)
         {
@@ -55,29 +55,28 @@ namespace SockGet.Core
                 Body = content
             }, Token.Message);
         }
-        public Result Request(string action, string content ,int timeout = -1)
+        public Result Request(string action, string content, int timeout = -1)
         {
             return Request(new Message()
             {
                 Head = action,
                 Body = content
-            },Token.Message , timeout);
+            }, Token.Message, timeout);
         }
 
 
-        public string RequestTag(string tagName ,int timeout = -1)
+        public string RequestTag(string tagName, int timeout = -1)
         {
             return Request(new Message()
             {
                 Head = tagName,
             },
-            Token.Tag , timeout).Head;
+            Token.Tag, timeout).Head;
         }
-        public bool Heartbeat(string echo,int interval, int timeout = -1)
+        public bool Heartbeat(string echo, int interval, int timeout)
         {
             var msg = new Message();
-            msg.Load(echo, interval);
-
+            msg.Load(echo, (interval ,timeout));
             return Request(msg, Token.Heartbeat, timeout)?.Head == echo;
         }
 
@@ -97,7 +96,23 @@ namespace SockGet.Core
 
         internal string CloseReason;
         internal DateTimeOffset LastReceive { get; set; }
-        internal bool IsReceiving { get; set; }
+        internal DateTimeOffset LastHeartbeat { get; set; }
+
+        internal object ReceiveLock = "";
+
+        internal bool receiving = false;
+        internal bool IsReceiving { get {
+
+                bool value;
+
+                lock(ReceiveLock)
+                {
+                    value = receiving;
+                }
+                return value;
+            
+            } }
+   
         internal bool IsTransmitting { get; set; }
 
         internal void Listen()
@@ -105,68 +120,77 @@ namespace SockGet.Core
             Task.Run((() =>
             {
                 try
-                {
+                { 
+                    LastReceive = DateTimeOffset.Now;
                     while (IsConnected())
                     {
-                        IsReceiving = false;
-
+                       
                         int count = 0;
                         byte[] buffer = new byte[Header.Size];
                         count = socket.ReadBytes(buffer, 0, Header.Size);
-                        LastReceive = DateTimeOffset.Now;
 
-                        IsReceiving = true;
                         if (count == Header.Size)
                         {
-                            var header = Header.Parse(buffer);
-                            if (header.version == 1 )
+                            lock (ReceiveLock)
                             {
-                                var token = (Token)header.token;
+                                receiving = true;
 
-                                socket.ReadBytes(header.infoLength, out var infoBuffer);
-                                socket.ReadBytes(header.headLength, out var headBuffer);
-                         
-                                var info = Encoding.UTF8.GetString(infoBuffer);
-                                var head = Encoding.UTF8.GetString(headBuffer);
-
-                                var sgstream = new SGSocketStream(socket, header.bodyLength);
-
-                                object obj = null;
-                                string body = null;
-
-                                if(sgstream.CanRead)
+                                var header = Header.Parse(buffer);
+                                if (header.version == 1)
                                 {
-                                    if (Receiver != null && (token == Token.Message))
+                                    var token = (Token)header.token;
+
+                                    socket.ReadBytes(header.infoLength, out var infoBuffer);
+                                    socket.ReadBytes(header.headLength, out var headBuffer);
+
+                                    var info = Encoding.UTF8.GetString(infoBuffer);
+                                    var head = Encoding.UTF8.GetString(headBuffer);
+
+                                    var sgstream = new SGSocketStream(socket, header.bodyLength);
+
+                                    object obj = null;
+                                    string body = null;
+
+                                    if (sgstream.CanRead)
                                     {
-                                        Receiver?.Invoke(head, info, sgstream);
-                                        sgstream.FinishRead();
+                                        if (Receiver != null && (token == Token.Message))
+                                        {
+                                            Receiver?.Invoke(head, info, sgstream);
+                                            sgstream.FinishRead();
+                                        }
+                                        else
+                                        {
+                                            using (var reader = new StreamReader(sgstream))
+                                                body = reader.ReadToEnd();
+                                        }
                                     }
-                                    else
+
+                                    var received = new Result(head, body, info, obj);
+
+                                    switch (header.Type)
                                     {
-                                        using (var reader = new StreamReader(sgstream))
-                                            body = reader.ReadToEnd();
+                                        case Enums.Type.Message:
+                                            HandleMessage(header, received);
+                                            break;
+                                        case Enums.Type.Request:
+                                            HandleRequest(header, received);
+                                            break;
+                                        case Enums.Type.Response:
+                                            HandleResponse(header, received);
+                                            break;
+                                        default:
+                                            break;
                                     }
+
+                                    LastReceive = DateTimeOffset.Now;
+                                    receiving = false;
                                 }
-
-                                var received = new Result(head, body, info, obj);
-
-                                switch (header.Type)
+                                else
                                 {
-                                    case Enums.Type.Message:
-                                        HandleMessage(header, received);
-                                        break;
-                                    case Enums.Type.Request:
-                                        HandleRequest(header, received);
-                                        break;
-                                    case Enums.Type.Response:
-                                        HandleResponse(header, received);
-                                        break;
-                                    default:
-                                        break;
+                                    LastReceive = DateTimeOffset.Now;
+                                    receiving = false;
+                                    throw new UnsupportedVersionException("Unsupported SG version !");
                                 }
-                            }else
-                            {
-                                throw new UnsupportedVersionException("Unsupported SG version !");
                             }
                         }
                         else
@@ -211,24 +235,40 @@ namespace SockGet.Core
         }
 
         bool HeartbeatListening { get; set; } = false;
-        private void ListenHeartbeat(int interval)
+        private void ListenHeartbeat(int interval, int timeout)
         {
-            if(!HeartbeatListening)
+            if (!HeartbeatListening)
             {
                 HeartbeatListening = true;
-                Task.Run(async () =>
-                {
-                    while (IsConnected() && HeartbeatListening)
-                    {
 
-                        if (!IsReceiving && (DateTimeOffset.Now - LastReceive).TotalMilliseconds > interval )
+                var t = new System.Timers.Timer();
+                t.Interval = interval;
+                t.AutoReset = true;
+                t.Elapsed += (s, e) =>
+                {
+                    if (!IsReceiving)
+                    {
+                        var diff = (DateTimeOffset.Now - LastReceive);
+
+                        if (diff.TotalMilliseconds > interval + timeout)
                         {
                             // close connection
-                            Close( 0 , "No heartbeat signal received from server.");
+                            Close(0, "No heartbeat signal received from server.");
                         }
-                        await Task.Delay(interval);
+
+                        t.Interval = interval - (int)(diff.Milliseconds * 0.1);
                     }
-                });
+                    else
+                        t.Interval = interval;
+  
+                };
+
+                Disconnected += (s, e) =>
+                {
+                    t.Stop();
+                };
+                t.Start();
+                 
             }else
             {
                 if(interval <= 0)
@@ -282,10 +322,10 @@ namespace SockGet.Core
                     {
                         Response(header.id, Data.Response.From(received.Head , null), header.Token,  Status.OK);
 
-                        var interval = received.As<int>();
+                        var (interval,timeout) = received.As<(int,int)>();
                         if (interval > 0)
                         {
-                            ListenHeartbeat(interval);
+                            ListenHeartbeat(interval,timeout);
                         }else
                         {
                             HeartbeatListening = false;
