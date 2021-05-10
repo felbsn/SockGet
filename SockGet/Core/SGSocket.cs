@@ -192,6 +192,9 @@ namespace SockGet.Core
                     if (IsAuthorised)
                     {
                         Disconnected?.Invoke(this, new DisconnectedEventArgs(CloseReason));
+
+                        // reset reason after emit.
+                        CloseReason = null;
                     }
                     else
                     {
@@ -354,7 +357,7 @@ namespace SockGet.Core
             IsAuthorised = accept;
             if (!IsAuthorised)
             {
-                Close();
+                Close(0,"Authorization is unsuccessful");
             }
         }
         internal bool Authenticate()
