@@ -32,6 +32,8 @@ namespace WinformServer
             {
                 logPanel.Info("Client connected " + e.Client.Tags["name"]);
 
+                e.Client["peki"] = "test"; 
+
                 Invoke(new Action(() => lblConnectionCount.Text = server.Clients.Count.ToString()));
 
                 e.Client.DataReceived += (ss, ee) =>

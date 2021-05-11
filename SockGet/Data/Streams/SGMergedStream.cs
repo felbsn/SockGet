@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SockGet.Data
+namespace SockGet.Data.Streams
 {
     public class SGMergedStream : Stream
     {

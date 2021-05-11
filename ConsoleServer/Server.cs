@@ -43,6 +43,7 @@ namespace ConsoleServer
                     if (server.Clients.Count > 2)
                         reject = true;
 
+
                     Info($"Auth requested with '{e.Token}', reject status: {(reject ? "Rejected" : "Accepted")}");
                     e.Reject = reject;
 

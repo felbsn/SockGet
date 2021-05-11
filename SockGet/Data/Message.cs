@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using SockGet.Core;
 using SockGet.Core.Enums;
+using SockGet.Data.Streams;
 using SockGet.Serialization;
 
 namespace SockGet.Data

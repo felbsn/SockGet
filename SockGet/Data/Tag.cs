@@ -4,11 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SockGet.Core.Enums
+namespace SockGet.Data
 {
-    internal enum Status : byte
+    public class Tag
     {
-        OK,
-        Error,
+        public string Value;
     }
 }

@@ -28,8 +28,6 @@ namespace SockGet.Core
         public ushort  headLength; 
         public int bodyLength;
 
-        
-
         public byte[] GetBytes()
         {
             var bytes = new byte[Size];

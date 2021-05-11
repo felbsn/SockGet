@@ -89,14 +89,23 @@ namespace WinformClient
                 if (int.TryParse(tbPort.Text, out var port))
                 {
                     bool res = false;
-                    if (string.IsNullOrEmpty(tbAddress.Text))
+
+                    try
                     {
-                        res = await client.ConnectAsync(port , 0);
+                        if (string.IsNullOrEmpty(tbAddress.Text))
+                        {
+                            res = await client.ConnectAsync(port, 0);
+                        }
+                        else
+                        {
+                            res = await client.ConnectAsync(tbAddress.Text, port, 0);
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        res = await client.ConnectAsync(tbAddress.Text, port , 0);
+ 
                     }
+
                     if(res)
                     {
                         connected = true;       
@@ -127,7 +136,8 @@ namespace WinformClient
                 {
                     tbAuthFile.Text = Path.GetFileName(fd.FileName);
                     var str = File.ReadAllText(fd.FileName);
-                    client.AuthToken = str;
+                    if (str.Length < 65535) 
+                        client.AuthToken = str;
                 }
             }
         }
@@ -156,6 +166,27 @@ namespace WinformClient
                 
             }    
 
+        }
+
+        private void btnTagTest_Click(object sender, EventArgs e)
+        {
+            var rng = new Random();
+            client["a"] = rng.Next(99).ToString();
+            client["b"] = rng.Next(99).ToString();
+
+            logPanel.Info($"Before");
+            foreach (var pair in client.Tags)
+            {
+                logPanel.Info($"[{pair.Key}]:{pair.Value}");
+            }
+
+            client.Sync();
+
+            logPanel.Info($"After");
+            foreach (var pair in client.Tags)
+            {
+                logPanel.Info($"[{pair.Key}]:{pair.Value}");
+            }
         }
     }
 }

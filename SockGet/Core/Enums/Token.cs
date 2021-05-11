@@ -7,11 +7,10 @@ using System.Threading.Tasks;
 namespace SockGet.Core.Enums
 {
     [Flags]
-    internal enum Token 
+    internal enum Token : byte
     {
         Message,
         Auth,
-        Tag,
         Heartbeat,
         Sync
     }

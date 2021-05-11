@@ -7,7 +7,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SockGet.Client
+namespace SockGet.Data.Streams
 {
     public class SGSocketStream : Stream
     {
