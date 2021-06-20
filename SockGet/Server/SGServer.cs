@@ -26,7 +26,7 @@ namespace SockGet.Server
 
         public bool UseHeartbeat { get; set; } = false;
         public int HeartbeatInterval { get; set; } = 10_000;
-        public int HeartbeatTimeout { get; set; } = 5_000;
+        public int HeartbeatTimeout { get; set; } = 15_000;
 
         public int AuthenticationTimeout { get; set; } = 2000;
 
@@ -106,7 +106,6 @@ namespace SockGet.Server
                                     client.Close();
                                 }
                             });
-                           
                         }
                     }
                 }
@@ -149,6 +148,7 @@ namespace SockGet.Server
                         {
                             Task.Run(() =>
                             {
+                                //Console.WriteLine($"{DateTime.Now} HeartbeatInterval:{HeartbeatInterval} HeartbeatTimeout:{HeartbeatTimeout}");
                                 bool alive = client.Heartbeat(DateTime.Now.ToString(), HeartbeatInterval, HeartbeatTimeout);
                                 if (!alive)
                                     client.Close(0, "No heartbeat response received");

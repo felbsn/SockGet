@@ -76,7 +76,12 @@ namespace SockGet.Core
         {
             var msg = new Message();
             msg.Load(echo, (interval, timeout));
-            return Request(msg, Token.Heartbeat, timeout)?.Head == echo;
+            var ret = Request(msg, Token.Heartbeat, timeout)?.Head;
+
+            //Console.WriteLine($"Heartbeat recv {DateTime.Now}");
+
+            var res = ret == echo;
+            return res;
         }
 
 
@@ -213,6 +218,8 @@ namespace SockGet.Core
         }
 
         bool HeartbeatListening { get; set; } = false;
+
+
         private void ListenHeartbeat(int interval, int timeout)
         {
             if (!HeartbeatListening)
@@ -233,7 +240,6 @@ namespace SockGet.Core
                             // close connection
                             Close(0, "No heartbeat signal received from server.");
                         }
-
                         t.Interval = interval - (int)(diff.Milliseconds);   
                     }
                     else
@@ -472,7 +478,7 @@ namespace SockGet.Core
             }
         }
         internal void Response(uint id, Message message, Token token, Status status) => Send(message, token, status, Enums.Type.Response, id);
-        internal Task ResponseAsync(uint id, Message message, Token token, Status status) => Task.Run(() => ResponseAsync(id, message, token, status));
+        internal Task ResponseAsync(uint id, Message message, Token token, Status status) => Task.Run(() => Response(id, message, token, status));
 
     }
 }

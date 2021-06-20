@@ -124,7 +124,7 @@ namespace SockGet.Client
             }
             else
             {
-                socket.Close();
+                socket?.Close();
                 throw new ConnectionTimeoutException("Connection timed out.");
             }
         }
