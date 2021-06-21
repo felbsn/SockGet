@@ -206,8 +206,8 @@ namespace SockGet.Core
                     else
                     {
                         //if auth failed without response, simulate respond event with rejection
-                        var args = new AuthRespondEventArgs(null, null, true);
-                        AuthRespond?.Invoke(this, args);
+                        //var args = new AuthRespondEventArgs(null, null, true);
+                        //AuthRespond?.Invoke(this, args);
                     }
 
                     IsAuthorised = false;
@@ -261,10 +261,6 @@ namespace SockGet.Core
                 }
             }
         }
-
-
-
-
 
         private void HandleMessage(Header header, Result received)
         {
@@ -410,7 +406,7 @@ namespace SockGet.Core
             IsAuthorised = accept;
             if (!IsAuthorised)
             {
-                Close(0, "Authorization is unsuccessful");
+                Close(1000, "Authorization is unsuccessful");
             }
         }
         internal bool Authenticate()
