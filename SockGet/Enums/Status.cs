@@ -4,14 +4,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SockGet.Core.Enums
+namespace SockGet.Enums
 {
-    [Flags]
-    internal enum Token : byte
+    public enum Status : byte
     {
-        Message,
-        Auth,
-        Heartbeat,
-        Sync
+        OK,
+        Error,
+        Cancel,
+        Rejected
     }
 }

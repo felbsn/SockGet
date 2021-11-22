@@ -9,5 +9,5 @@ using System.Threading.Tasks;
 
 namespace SockGet.Delegates
 {
-    public delegate object DataReceiver(string head, string type, SGSocketStream stream);
+    public delegate Stream DataReceiver(string head, string info, SgSocketStream stream);
 }

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -15,13 +16,18 @@ namespace WinformServer
     public partial class ServerForm : Form
     {
 
-        SGServer server;
+        SgServer server;
 
 
         public ServerForm()
         {
             InitializeComponent();
-            server = new SGServer();
+            server = new SgServer();
+
+
+            //server.UseHeartbeat = true;
+            server.HeartbeatInterval = 5_000;
+            server.HeartbeatTimeout = 5_000;
 
             server.ClientAuthRequested += (s, e) =>
             {
@@ -38,7 +44,19 @@ namespace WinformServer
 
                 e.Client.DataReceived += (ss, ee) =>
                 {
-                    if (ee.Data.Body != null && ee.Data.Body.Contains("cef"))
+                    if(ee.Data.Head == "file")
+                    {
+                        logPanel.Info("file received from" + e.Client.Tags["name"]);
+                        ee.Data.AsFile("TempFile.dat");
+
+                        var fs = new FileStream("TempFile.dat", FileMode.Open);
+                        ee.Response = Response.From("file", fs);
+
+                        return;
+                    }
+
+                    var content = ee.Data.AsString();
+                    if (content != null && content.Contains("cef"))
                     {
                         logPanel.Error(ee.Data.Head + " Message rejected" );
                         ee.Response = Response.Error("some error occurred");
@@ -49,10 +67,10 @@ namespace WinformServer
                         {
                             if (c != e.Client)
                                 receivers +=c["name"] + ",";
-
-                            c.Message(ee.Data.Head, ee.Data.Body);
+                            var msg = new SockGet.Data.Message().Load(ee.Data.Head, content);
+                            c.Send(msg);
                         }
-                        ee.Response = Response.From("Message recevied by", receivers);
+                        ee.Response = Response.Ok("Message recevied by", receivers);
                     }
                 };
             };

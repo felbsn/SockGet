@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace SockGet.Server
 {
-    public class SGServer
+    public class SgServer
     {
         public event EventHandler<EventArgs> Started;
         public event EventHandler<EventArgs> Stopped;
@@ -22,7 +22,7 @@ namespace SockGet.Server
         public event EventHandler<ClientConnectionEventArgs> ClientDisconnected;
 
         Socket socket;
-        List<SGSocket> clients;
+        List<SgSocket> clients;
 
         public bool UseHeartbeat { get; set; } = false;
         public int HeartbeatInterval { get; set; } = 10_000;
@@ -30,7 +30,7 @@ namespace SockGet.Server
 
         public int AuthenticationTimeout { get; set; } = 2000;
 
-        public IReadOnlyList<SGSocket> Clients => clients;
+        public IReadOnlyList<SgSocket> Clients => clients;
 
         public void Stop()
         {
@@ -38,9 +38,9 @@ namespace SockGet.Server
             socket = null;
         }
 
-        public SGServer()
+        public SgServer()
         {
-            clients = new List<SGSocket>();
+            clients = new List<SgSocket>();
         }
 
         public void Serve(int port)
@@ -70,7 +70,7 @@ namespace SockGet.Server
 
                         lock(this)
                         {
-                            var client = new SGClient(sock);
+                            var client = new SgClient(sock);
                             client.AuthRequested += (s, e) =>
                             {
                                 var args = new ClientAuthRequestedEventArgs(client, e.AuthToken, e.Response);

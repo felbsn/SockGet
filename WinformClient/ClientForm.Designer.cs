@@ -34,6 +34,7 @@ namespace WinformClient
             this.tbMessage = new System.Windows.Forms.TextBox();
             this.btnSend = new System.Windows.Forms.Button();
             this.connectionPanel = new System.Windows.Forms.Panel();
+            this.btnTagTest = new System.Windows.Forms.Button();
             this.lblName = new System.Windows.Forms.Label();
             this.tbAuthFile = new System.Windows.Forms.TextBox();
             this.btnSelectAuth = new System.Windows.Forms.Button();
@@ -41,7 +42,7 @@ namespace WinformClient
             this.tbConnect = new System.Windows.Forms.Button();
             this.tbAddress = new System.Windows.Forms.TextBox();
             this.logPanel = new WinformClient.LogPanel();
-            this.btnTagTest = new System.Windows.Forms.Button();
+            this.btnSendFile = new System.Windows.Forms.Button();
             this.sendPanel.SuspendLayout();
             this.connectionPanel.SuspendLayout();
             this.SuspendLayout();
@@ -80,6 +81,7 @@ namespace WinformClient
             // connectionPanel
             // 
             this.connectionPanel.BackColor = System.Drawing.SystemColors.ControlLightLight;
+            this.connectionPanel.Controls.Add(this.btnSendFile);
             this.connectionPanel.Controls.Add(this.btnTagTest);
             this.connectionPanel.Controls.Add(this.lblName);
             this.connectionPanel.Controls.Add(this.tbAuthFile);
@@ -92,6 +94,16 @@ namespace WinformClient
             this.connectionPanel.Name = "connectionPanel";
             this.connectionPanel.Size = new System.Drawing.Size(800, 32);
             this.connectionPanel.TabIndex = 2;
+            // 
+            // btnTagTest
+            // 
+            this.btnTagTest.Location = new System.Drawing.Point(490, 4);
+            this.btnTagTest.Name = "btnTagTest";
+            this.btnTagTest.Size = new System.Drawing.Size(61, 23);
+            this.btnTagTest.TabIndex = 16;
+            this.btnTagTest.Text = "Tag Test";
+            this.btnTagTest.UseVisualStyleBackColor = true;
+            this.btnTagTest.Click += new System.EventHandler(this.btnTagTest_Click);
             // 
             // lblName
             // 
@@ -153,15 +165,15 @@ namespace WinformClient
             this.logPanel.Size = new System.Drawing.Size(800, 342);
             this.logPanel.TabIndex = 0;
             // 
-            // btnTagTest
+            // btnSendFile
             // 
-            this.btnTagTest.Location = new System.Drawing.Point(490, 4);
-            this.btnTagTest.Name = "btnTagTest";
-            this.btnTagTest.Size = new System.Drawing.Size(61, 23);
-            this.btnTagTest.TabIndex = 16;
-            this.btnTagTest.Text = "Tag Test";
-            this.btnTagTest.UseVisualStyleBackColor = true;
-            this.btnTagTest.Click += new System.EventHandler(this.btnTagTest_Click);
+            this.btnSendFile.Location = new System.Drawing.Point(380, 4);
+            this.btnSendFile.Name = "btnSendFile";
+            this.btnSendFile.Size = new System.Drawing.Size(104, 23);
+            this.btnSendFile.TabIndex = 17;
+            this.btnSendFile.Text = "Send File";
+            this.btnSendFile.UseVisualStyleBackColor = true;
+            this.btnSendFile.Click += new System.EventHandler(this.btnSendFile_Click);
             // 
             // ClientForm
             // 
@@ -197,6 +209,7 @@ namespace WinformClient
         private System.Windows.Forms.TextBox tbAddress;
         private System.Windows.Forms.Label lblName;
         private System.Windows.Forms.Button btnTagTest;
+        private System.Windows.Forms.Button btnSendFile;
     }
 }
 

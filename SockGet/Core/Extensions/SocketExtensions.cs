@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SockGet.Extensions
+namespace SockGet.Core.Extensions
 {
     public static class SocketExtensions
     {

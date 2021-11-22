@@ -4,11 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SockGet.Core.Enums
+namespace SockGet.Events
 {
-    internal enum Status : byte
+    public class ConnectedEventArgs : EventArgs
     {
-        OK,
-        Error,
     }
 }

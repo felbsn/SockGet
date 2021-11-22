@@ -1,4 +1,5 @@
 ﻿using SockGet.Data;
+using SockGet.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,5 +20,6 @@ namespace SockGet.Events
         public Result Data { get; }
         public bool IsResponseRequired { get; }
         public Response Response { get; set; }
+        public Status Status { get; internal set; }
     }
 }

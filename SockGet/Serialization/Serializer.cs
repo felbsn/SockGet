@@ -7,38 +7,34 @@ using System.Threading.Tasks;
 
 namespace SockGet.Serialization
 {
-    public static class Serializer
+    public class Serializer : ISerializer
     {
-        public static string Serialize(object o)
+        public byte[] Serialize(object o)
         {
             var settings = new Newtonsoft.Json.JsonSerializerSettings()
             {
                 PreserveReferencesHandling = Newtonsoft.Json.PreserveReferencesHandling.Objects,
                 ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Serialize,
             };
-            var data = Newtonsoft.Json.JsonConvert.SerializeObject(o, settings);
+            var str = Newtonsoft.Json.JsonConvert.SerializeObject(o, settings);
+            var data = Encoding.UTF8.GetBytes(str);
             return data;
         }
-        public static T Deserialize<T>(string data)
+        public T Deserialize<T>(byte[] data)
         {
-            if (data == null)
+            if (data == null || data.Length == 0)
                 return default;
-            var settings = new Newtonsoft.Json.JsonSerializerSettings()
-            {
-                PreserveReferencesHandling = Newtonsoft.Json.PreserveReferencesHandling.Objects
-            };
-            var obj = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(data, settings);
-            return obj;
-        }
-        public static object Deserialize(string data , string type)
-        {
-            var settings = new Newtonsoft.Json.JsonSerializerSettings()
-            {
-                PreserveReferencesHandling = Newtonsoft.Json.PreserveReferencesHandling.Objects
-            };
 
-            var t = Type.GetType(type);
-            var obj = Newtonsoft.Json.JsonConvert.DeserializeObject(data, t, settings);
+
+            var str = Encoding.UTF8.GetString(data);
+
+            var obj = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(
+                str,
+                new Newtonsoft.Json.JsonSerializerSettings()
+                {
+                    PreserveReferencesHandling = Newtonsoft.Json.PreserveReferencesHandling.Objects
+                }
+            );
             return obj;
         }
     }

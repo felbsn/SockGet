@@ -1,11 +1,12 @@
 ﻿using SockGet.Client;
 using SockGet.Core.Enums;
+using SockGet.Enums;
 using SockGet.Data;
 using SockGet.Data.Streams;
 using SockGet.Delegates;
 using SockGet.Events;
 using SockGet.Exceptions;
-using SockGet.Extensions;
+using SockGet.Core.Extensions;
 using SockGet.Serialization;
 using SockGet.Utils;
 using System;
@@ -16,19 +17,23 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Type = SockGet.Core.Enums.Type;
 
 namespace SockGet.Core
 {
-    public abstract class SGSocket
+    public abstract class SgSocket
     {
+        public static ISerializer Serializer;
+
         public event EventHandler<DataReceivedEventArgs> DataReceived;
         public event EventHandler<AuthRespondEventArgs> AuthRespond;
-        public event EventHandler Connected;
+        public event EventHandler<ConnectedEventArgs> Connected;
         public event EventHandler<DisconnectedEventArgs> Disconnected;
 
+        public DataReceiver Receiver { get; set; }
         public bool IsAuthorised { get; protected set; }
         public Dictionary<string, string> Tags => tags;
-        public DataReceiver Receiver { get; set; }
+      
         public string AuthToken { get; set; }
         public void Close(int timeout = 0, string reason = null)
         {
@@ -47,49 +52,62 @@ namespace SockGet.Core
             set => Tags[key] = value;
         }
 
-        public Task MessageAsync(string action, string content) => Task.Run(() => Message(action, content));
-        public Task<Result> RequestAsync(string action, string content, int timeout = -1) => Task.Run(() => Request(action, content, timeout));
-        public void Message(string action, string content)
+        public void Send(Message msg, Status status = Status.OK)
         {
-            Send(new Message()
-            {
-                Head = action,
-                Body = content
-            }, Token.Message);
+            var stream = msg.Build(status, Enums.Type.Message, Role.Message, 0);
+            Transmit(stream);
         }
-        public Result Request(string action, string content, int timeout = -1)
+        public Result Request(Message msg, Status status = Status.OK, int timeout = -1)
         {
-            return Request(new Message()
-            {
-                Head = action,
-                Body = content
-            }, Token.Message, timeout);
+            var id = (uint)Interlocked.Increment(ref counter);
+            var stream = msg.Build(status, Enums.Type.Message, Role.Request, id);
+            return TransmitReceive(stream, id , timeout);
         }
+
+        public void Send(string head, object body, Status status = Status.OK)
+        {
+            Send(new Message().Load(head, body), status);
+        }
+
+        public Result Request(string head, object body, Status status = Status.OK, int timeout = -1)
+        {
+            return Request(new Message().Load(head, body), status ,timeout);
+        }
+
+        public Task<Result> RequestAsync(string head, object body, Status status = Status.OK, int timeout = -1) => Task.Run(()=> Request(head, body, status, timeout));
+        public Task SendAsync(string head, object body, Status status = Status.OK) => Task.Run(()=> Send(head, body, status));
+
+
         public void Sync(int timeout = -1)
         {
+            var id = (uint)Interlocked.Increment(ref counter);
             var msg = new Message();
-            msg.Load("tag", tags);
-            Request(msg, Token.Sync, timeout);
+
+            msg.Load("tags", tags);
+
+            var stream = msg.Build(Status.OK, Enums.Type.Sync, Role.Request, id);
+            TransmitReceive(stream, id , timeout);
         }
- 
         public bool Heartbeat(string echo, int interval, int timeout)
         {
             var msg = new Message();
-            msg.Load(echo, (interval, timeout));
-            var ret = Request(msg, Token.Heartbeat, timeout)?.Head;
+            msg.Load(echo, ((interval, timeout)));
 
-            //Console.WriteLine($"Heartbeat recv {DateTime.Now}");
+            var id = (uint)Interlocked.Increment(ref counter);
+            var stream = msg.Build(Status.OK, Enums.Type.Heartbeat, Role.Request, id);
+            var result = TransmitReceive(stream, id, timeout);
 
-            var res = ret == echo;
-            return res;
+            return result?.Head == echo;
         }
 
 
         protected Socket socket;
-        protected SGSocket()
+        protected SgSocket()
         {
             pending = new Dictionary<uint, TaskCompletionSource<Result>>();
             tags = new Dictionary<string, string>();
+
+            Serializer = Serializer ?? new Serializer();
         }
 
         internal event EventHandler<AuthRequestedEventArgs> AuthRequested;
@@ -126,46 +144,58 @@ namespace SockGet.Core
                             IsReceiving = true;
 
                             var header = Header.Parse(buffer);
-                            if (header.version == 1)
+                            if (header.version == 2)
                             {
-                                var token = (Token)header.token;
+                                var type = (Enums.Type)header.type;
 
                                 socket.ReadBytes(header.infoLength, out var infoBuffer);
                                 socket.ReadBytes(header.headLength, out var headBuffer);
 
-                                var info = Encoding.UTF8.GetString(infoBuffer);
-                                var head = Encoding.UTF8.GetString(headBuffer);
+                                var info_str = Encoding.UTF8.GetString(infoBuffer);
+                                var head_str = Encoding.UTF8.GetString(headBuffer);
 
-                                var sgstream = new SGSocketStream(socket, header.bodyLength);
+                                var sgstream = new SgSocketStream(socket, header.bodyLength);
 
-                                object obj = null;
-                                string body = null;
-
-                                if (sgstream.CanRead)
+                                Stream stream;
+                                if(sgstream.Length > 0)
                                 {
-                                    if (Receiver != null && (token == Token.Message))
+                                    if (type == Type.Message && Receiver != null)
                                     {
-                                        Receiver?.Invoke(head, info, sgstream);
-                                        sgstream.FinishRead();
+                                        stream = Receiver?.Invoke(head_str, info_str, sgstream);
+                                        if (sgstream.CanRead)
+                                            sgstream.ReadToEnd();
                                     }
                                     else
                                     {
-                                        using (var reader = new StreamReader(sgstream))
-                                            body = reader.ReadToEnd();
+                                        stream = new MemoryStream();
+                                        sgstream.CopyTo(stream);
+                                        stream.Position = 0;
                                     }
-                                }
-
-                                var received = new Result(head, body, info, obj);
-
-                                switch (header.Type)
+                                }else
                                 {
-                                    case Enums.Type.Message:
+                                    stream = new MemoryStream();
+                                }
+                                
+
+                                var received = new Result()
+                                {
+                                    head_str = head_str,
+                                    info_str = info_str,
+                                    head = headBuffer,
+                                    info = infoBuffer,
+                                    body = stream,
+                                    Status = (Status)header.status
+                                };
+
+                                switch (header.Role)
+                                {
+                                    case Role.Message:
                                         HandleMessage(header, received);
                                         break;
-                                    case Enums.Type.Request:
+                                    case Role.Request:
                                         HandleRequest(header, received);
                                         break;
-                                    case Enums.Type.Response:
+                                    case Role.Response:
                                         HandleResponse(header, received);
                                         break;
                                     default:
@@ -174,7 +204,6 @@ namespace SockGet.Core
                             }
                             else
                                 throw new UnsupportedVersionException("Unsupported SG version !");
-
                         }
                         else
                         {
@@ -183,8 +212,13 @@ namespace SockGet.Core
                         }
                     }
                 }
+                catch (SocketException ex)
+                {
+                    CloseReason = ex.Message;
+                }
                 catch (Exception ex)
                 {
+                    CloseReason = ex.Message;
                     _ = ex;
                 }
                 finally
@@ -231,23 +265,31 @@ namespace SockGet.Core
                 t.AutoReset = true;
                 t.Elapsed += (s, e) =>
                 {
-                    if (!IsReceiving)
+                    if (HeartbeatListening)
                     {
-                        var diff = (DateTimeOffset.Now - LastReceive);
-
-                        if (diff.TotalMilliseconds > interval + timeout)
+                        if (!IsReceiving)
                         {
-                            // close connection
-                            Close(0, "No heartbeat signal received from server.");
+                            var diff = (DateTimeOffset.Now - LastReceive);
+
+                            if (diff.TotalMilliseconds > interval + timeout)
+                            {
+                                // close connection
+                                Close(0, "No heartbeat signal received from server.");
+                            }
+                            t.Interval = interval - (int)(diff.Milliseconds);
                         }
-                        t.Interval = interval - (int)(diff.Milliseconds);   
+                        else
+                            t.Interval = interval;
                     }
                     else
-                        t.Interval = interval;
+                    {
+                        t.Stop();
+                    }
                 };
 
                 Disconnected += (s, e) =>
                 {
+                    HeartbeatListening = false;
                     t.Stop();
                 };
                 t.Start();
@@ -265,22 +307,32 @@ namespace SockGet.Core
         private void HandleMessage(Header header, Result received)
         {
             var args = new DataReceivedEventArgs(received, false, null);
-            Task.Run(() => DataReceived?.Invoke(this, args));
+            Task.Run(() =>
+            {
+                DataReceived?.Invoke(this, args);
+            });
         }
         private void HandleRequest(Header header, Result received)
         {
-            switch (header.Token)
+            switch (header.Type)
             {
-                case Token.Message:
+                case Enums.Type.Message:
                     {
                         var args = new DataReceivedEventArgs(received, true, Data.Response.Empty);
-                        Task.Run(() => DataReceived?.Invoke(this, args))
-                            .ContinueWith(t => Response(header.id, args.Response, header.Token, args.Response?.IsError == true ? Status.Error : Status.OK));
+                        Task.Run(() =>
+                        {
+                            DataReceived?.Invoke(this, args);
+                            var stream = args.Response.Build(args.Status, Type.Message, Role.Response, header.id);
+                            Transmit(stream);
+                            stream.Close();
+                        });
                     }
                     break;
-                case Token.Auth:
+                case Enums.Type.Auth:
                     {
                         var recvTags = received.As<Dictionary<string, string>>();
+
+                        if(recvTags != null)
                         foreach (var pair in recvTags)
                         {
                             tags[pair.Key] = pair.Value;
@@ -288,6 +340,7 @@ namespace SockGet.Core
 
                         var args = new AuthRequestedEventArgs(received.Head);
                         AuthRequested?.Invoke(this, args);
+ 
 
                         var response = args.Response ?? Data.Response.Empty;
                         if (args.Reject || response.IsError)
@@ -300,10 +353,10 @@ namespace SockGet.Core
                         }
                     }
                     break;
-                case Token.Heartbeat:
+                case Enums.Type.Heartbeat:
                     {
-                        ResponseAsync(header.id, Data.Response.From(received.Head, null), header.Token, Status.OK);
-
+                        Transmit(new Message().Load(received.Head, new byte[0]).Build(Status.OK, Type.Heartbeat, Role.Response, header.id));
+ 
                         var (interval, timeout) = received.As<(int, int)>();
                         if (interval > 0)
                         {
@@ -315,9 +368,9 @@ namespace SockGet.Core
                         }
                     }
                     break;
-                case Token.Sync:
+                case Enums.Type.Sync:
                     {
-                        var dict = received.As<Dictionary<string,string>>();
+                        var dict = received.As<Dictionary<string, string>>();
                         var diffs = tags.Keys.Except(dict.Keys);
                         foreach (var pair in dict)
                         {
@@ -330,7 +383,7 @@ namespace SockGet.Core
                             diffDict[key] = tags[key];
                         }
 
-                        Response(header.id, Data.Response.From(received.Head, diffDict), header.Token, Status.OK);
+                        Transmit(new Message().Load(diffDict).Build(Status.OK, Type.Sync, Role.Response, header.id));
                     }
                     break;
                 default:
@@ -340,14 +393,15 @@ namespace SockGet.Core
         private void HandleResponse(Header header, Result received)
         {
             var args = new DataReceivedEventArgs(received, false, null);
-            switch (header.Token)
+            switch (header.Type)
             {
-                case Token.Auth:
+                case Enums.Type.Auth:
                     {
-                        AuthRespond?.Invoke(this, new AuthRespondEventArgs(received.Head, received.Body, header.Status != Status.OK));
+                        //todo:proper auth body 
+                        AuthRespond?.Invoke(this, new AuthRespondEventArgs(received.Head, string.Empty, header.Status != Status.OK));
                     }
                     break;
-                case Token.Sync:
+                case Enums.Type.Sync:
                     {
                         var dict = received.As<Dictionary<string, string>>();
                         foreach (var pair in dict)
@@ -362,6 +416,8 @@ namespace SockGet.Core
                     break;
             }
         }
+
+
         private void DispatchResult(uint id, Result received)
         {
             if (pending.TryGetValue(id, out var tcs))
@@ -375,13 +431,11 @@ namespace SockGet.Core
             }
         }
 
-        internal void Transmit(Header header, Stream stream)
+        internal void Transmit(Stream stream)
         {
             lock (socket)
             {
                 IsTransmitting = true;
-                socket.Send(header.GetBytes());
-
                 int read;
                 byte[] buffer = new byte[1024 * 1024];
                 while ((read = stream.Read(buffer, 0, 1024 * 1024)) > 0)
@@ -391,33 +445,51 @@ namespace SockGet.Core
                 IsTransmitting = false;
             }
         }
-        internal void Send(Message message, Token token = Token.Message, Status status = Status.OK, Enums.Type type = Enums.Type.Message, uint id = 0)
+        internal Result Receive(uint id, int timeout = -1)
         {
-            var stream = message.GetStream(out var header);
-            header.id = id;
-            header.Token = token;
-            header.Status = status;
-            header.Type = type;
-            Transmit(header, stream);
+            var tcs = new TaskCompletionSource<Result>();
+            pending.Add(id, tcs);
+            var task = tcs.Task;
+            try
+            {
+                return task.Wait(timeout) ? task.Result : null;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
         }
+        internal Result TransmitReceive(Stream stream, uint id, int timeout = -1)
+        {
+            var tcs = new TaskCompletionSource<Result>();
+            pending.Add(id, tcs);
+            var task = tcs.Task;
+            try
+            {
+                Transmit(stream);
+                return task.Wait(timeout) ? task.Result : null;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+ 
         internal void Authorize(Message data, bool accept)
         {
-            Send(data, Token.Auth, accept ? Status.OK : Status.Error, Enums.Type.Response, 0);
+            Transmit(data.Build(accept ? Status.OK : Status.Rejected, Type.Auth, Role.Response, 0));
             IsAuthorised = accept;
             if (!IsAuthorised)
             {
+                //todo: adjustable timeout?
                 Close(1000, "Authorization is unsuccessful");
             }
         }
         internal bool Authenticate()
         {
-            var body = Serializer.Serialize(tags);
-
-            var msg = new Message()
-            {
-                Head = AuthToken,
-                Body = body
-            };
+            //todo: authenticate with more data....
+            var msg = new Message();
+            msg.Load(AuthToken, Tags);
 
             var tcs = new TaskCompletionSource<bool>();
             EventHandler<AuthRespondEventArgs> authRespondEvent = null;
@@ -433,48 +505,33 @@ namespace SockGet.Core
 
             AuthRespond += authRespondEvent;
 
+
+            IsAuthorised = false;
+
             try
             {
-                Send(msg, Token.Auth, Status.OK, Enums.Type.Request, 0);
+                var stream = msg.Build(Status.OK, Enums.Type.Auth, Role.Request, 0);
+                Transmit(stream);
+                //Send(msg, Enums.Type.Auth, Status.OK, Enums.Role.Request, 0);
                 tcs.Task.Wait();
+                IsAuthorised = tcs.Task.Result;
             }
             catch (Exception)
             {
-                return false;
-            }
 
-            IsAuthorised = tcs.Task.Result;
+            }
 
             if (!IsAuthorised)
-            {
-                throw new AuthorizationException("Authorization is unsuccessful");
-            }
 
-            Connected?.Invoke(this, EventArgs.Empty);
+                throw new AuthorizationException("Authorization is unsuccessful");
+
+
+            Connected?.Invoke(this, new ConnectedEventArgs());
 
             return IsAuthorised;
         }
-        internal Result Request(Message message, Token token, int timeout = -1)
-        {
-            var id = (uint)Interlocked.Increment(ref counter);
-
-            var tcs = new TaskCompletionSource<Result>();
-            pending.Add(id, tcs);
-
-            Send(message, token, Status.OK, Enums.Type.Request, id);
-
-            var task = tcs.Task;
-            try
-            {
-                return task.Wait(timeout) ? task.Result : null;
-            }
-            catch (Exception ex)
-            {
-                return null;
-            }
-        }
-        internal void Response(uint id, Message message, Token token, Status status) => Send(message, token, status, Enums.Type.Response, id);
-        internal Task ResponseAsync(uint id, Message message, Token token, Status status) => Task.Run(() => Response(id, message, token, status));
-
+    
+        //internal void Response(uint id, Message message, Enums.Type token, Status status) => Send(message, token, status, Enums.Transmission.Response, id);
+        //internal Task ResponseAsync(uint id, Message message, Enums.Type token, Status status) => Task.Run(() => Response(id, message, token, status));
     }
 }

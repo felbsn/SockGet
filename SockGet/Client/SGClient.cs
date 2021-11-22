@@ -13,16 +13,16 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using SockGet.Extensions;
+using SockGet.Core.Extensions;
 using SockGet.Exceptions;
 
 namespace SockGet.Client
 {
-    public class SGClient : SGSocket
+    public class SgClient : SgSocket
     {
         public int Port { get; protected set; }
         public string Address { get; protected set; }
-        public SGClient() 
+        public SgClient() 
         {
       
         }
@@ -67,10 +67,7 @@ namespace SockGet.Client
         }
         public bool Connect(int port)
         {
-            IPHostEntry host = Dns.GetHostEntry("127.0.0.1");
-            IPAddress ipAddress = host.AddressList[0];
-
-            return Connect(ipAddress.ToString(), port);
+            return Connect("127.0.0.1", port);
         }
         public bool Connect(string address, int port)
         {
@@ -103,10 +100,7 @@ namespace SockGet.Client
         }
         public async Task<bool> ConnectAsync(int port, int timeout = 2000)
         {
-            IPHostEntry host = Dns.GetHostEntry("127.0.0.1");
-            IPAddress ipAddress = host.AddressList[0];
-
-            return await ConnectAsync(ipAddress.ToString(), port, timeout);
+            return await ConnectAsync("127.0.0.1", port, timeout);
         }
         public async Task<bool> ConnectAsync(string address, int port, int timeout = 2000)
         {
@@ -129,7 +123,7 @@ namespace SockGet.Client
             }
         }
 
-        internal SGClient(Socket socket)
+        internal SgClient(Socket socket)
         {
             this.socket = socket;
             IsAuthorised = true;

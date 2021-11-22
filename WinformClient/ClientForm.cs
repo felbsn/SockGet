@@ -14,7 +14,7 @@ namespace WinformClient
 {
     public partial class ClientForm : Form
     {
-        SGClient client;
+        SgClient client;
         string name;
 
         public ClientForm()
@@ -25,7 +25,13 @@ namespace WinformClient
 
             Text = "Client " + name;
 
-            client = new SGClient();
+            client = new SgClient();
+            client.Receiver = (h, i, s) =>
+            {
+                var ms = new MemoryStream();
+                s.CopyTo(ms);
+                return ms;
+            };
 
             client.Tags["name"] = name;
 
@@ -45,7 +51,7 @@ namespace WinformClient
                 {
                     tbAddress.ReadOnly = false;
                     tbPort.ReadOnly = false;
-                    logPanel.Info("Disconnected");
+                    logPanel.Info("Disconnected:"+e.Reason);
                     tbConnect.Text = "Connect";
                 }));
                
@@ -63,7 +69,13 @@ namespace WinformClient
             };
             client.DataReceived += (s, e) =>
             {
-                logPanel.Message(e.Data.Head, e.Data.Body);
+                if(e.Data.Head == "file")
+                {
+                    logPanel.Message("incoming file size ", e.Data.AsStream().Length.ToString());
+                }
+                else
+
+                logPanel.Message(e.Data.Head, e.Data.AsString());
             };
 
            
@@ -103,7 +115,7 @@ namespace WinformClient
                     }
                     catch (Exception ex)
                     {
- 
+                        _ = ex;
                     }
 
                     if(res)
@@ -144,10 +156,11 @@ namespace WinformClient
 
         private  async void btnSend_Click(object sender, EventArgs e)
         {
-            var response = await client.RequestAsync(name, tbMessage.Text);
-            if(response.IsOK)
+            //await
+            var response =  client.Request(new SockGet.Data.Message().Load(name, tbMessage.Text));//Async
+            if (response.Status == SockGet.Enums.Status.OK)
             {
-                logPanel.Info("Response:" + response.Head + " body:" + response.Body);
+                logPanel.Info("Response:'" + response.Head + "', body:'" + response.AsString()+"'");
             }else
             {
                 logPanel.Error("Response returned error");
@@ -186,6 +199,26 @@ namespace WinformClient
             foreach (var pair in client.Tags)
             {
                 logPanel.Info($"[{pair.Key}]:{pair.Value}");
+            }
+        }
+
+        private void btnSendFile_Click(object sender, EventArgs e)
+        {
+            using (var fd = new OpenFileDialog())
+            {
+                var res = fd.ShowDialog();
+                if (res == DialogResult.OK)
+                {
+                    using (var fs = new FileStream(fd.FileName , FileMode.Open))
+                    {
+                        logPanel.Info("file sent " + Path.GetFileName(fd.FileName));
+                        client.Request("file", fs);
+                    }
+                    //tbAuthFile.Text = Path.GetFileName(fd.FileName);
+                    //var str = File.ReadAllText(fd.FileName);
+                    //if (str.Length < 65535)
+                    //    client.AuthToken = str;
+                }
             }
         }
     }
