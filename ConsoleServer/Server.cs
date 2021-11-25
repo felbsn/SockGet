@@ -32,7 +32,7 @@ namespace ConsoleServer
         {
             try
             {
-                var server = new SGServer();
+                var server = new SgServer();
 
                 server.Serve(9999);
 
@@ -55,11 +55,12 @@ namespace ConsoleServer
                     Info($"Client connected {name ?? "Unnamed"}");
                     e.Client.DataReceived += (ss, ee) =>
                     {
-                        Message(ee.Data.Head, ee.Data.Body);
+                        var content = ee.Data.AsString();
+                        Message(ee.Data.Head, content);
 
                         if(ee.IsResponseRequired)
                         {
-                            if(ee.Data.Body?.Contains("x") == true)
+                            if(content.Contains("x") == true)
                             {
 
 
@@ -70,10 +71,10 @@ namespace ConsoleServer
                             {
                                 foreach (var client in server.Clients)
                                 {
-                                    client.Message(ee.Data.Head + "X", ee.Data.Body);
+                                    client.Send(new Message().Load(ee.Data.Head + "X", content));
                                 }
 
-                                ee.Response = Response.OK();
+                                ee.Response = Response.Ok();
                             }
 
                         }
@@ -88,7 +89,7 @@ namespace ConsoleServer
 
                     foreach (var client in server.Clients)
                     {
-                        client.Message("server", line);
+                        client.Send(new Message().Load("server", line));
                     }
                 }
             }

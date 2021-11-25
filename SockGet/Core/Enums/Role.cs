@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 
 namespace SockGet.Core.Enums
 {
-    internal enum Type : byte
+    internal enum Role : byte
     {
         Message,
-        Auth,
-        Heartbeat,
-        Sync
+        Request,
+        Response
     }
 }

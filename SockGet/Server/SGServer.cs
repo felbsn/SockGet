@@ -12,17 +12,21 @@ using System.Threading.Tasks;
 
 namespace SockGet.Server
 {
-    public class SGServer
+    public class SgServer : SgServer<Object>
+    {
+    }
+
+    public class SgServer<T>
     {
         public event EventHandler<EventArgs> Started;
         public event EventHandler<EventArgs> Stopped;
 
-        public event EventHandler<ClientAuthRequestedEventArgs> ClientAuthRequested;
-        public event EventHandler<ClientConnectionEventArgs> ClientConnected;
-        public event EventHandler<ClientConnectionEventArgs> ClientDisconnected;
+        public event EventHandler<ClientAuthRequestedEventArgs<T>> ClientAuthRequested;
+        public event EventHandler<ClientConnectionEventArgs<T>> ClientConnected;
+        public event EventHandler<ClientConnectionEventArgs<T>> ClientDisconnected;
 
         Socket socket;
-        List<SGSocket> clients;
+        List<SgSocket<T>> clients;
 
         public bool UseHeartbeat { get; set; } = false;
         public int HeartbeatInterval { get; set; } = 10_000;
@@ -30,7 +34,7 @@ namespace SockGet.Server
 
         public int AuthenticationTimeout { get; set; } = 2000;
 
-        public IReadOnlyList<SGSocket> Clients => clients;
+        public IReadOnlyList<SgSocket<T>> Clients => clients;
 
         public void Stop()
         {
@@ -38,9 +42,9 @@ namespace SockGet.Server
             socket = null;
         }
 
-        public SGServer()
+        public SgServer()
         {
-            clients = new List<SGSocket>();
+            clients = new List<SgSocket<T>>();
         }
 
         public void Serve(int port)
@@ -70,10 +74,10 @@ namespace SockGet.Server
 
                         lock(this)
                         {
-                            var client = new SGClient(sock);
+                            var client = new SgClient<T>(sock);
                             client.AuthRequested += (s, e) =>
                             {
-                                var args = new ClientAuthRequestedEventArgs(client, e.AuthToken, e.Response);
+                                var args = new ClientAuthRequestedEventArgs<T>(client, e.AuthToken, e.Response);
                                 ClientAuthRequested?.Invoke(this, args);
 
                                 e.Response = args.Response;
@@ -87,7 +91,7 @@ namespace SockGet.Server
                                             clients.Remove(client);
                                         }
 
-                                        ClientDisconnected?.Invoke(this, new ClientConnectionEventArgs(client , e1.Reason));
+                                        ClientDisconnected?.Invoke(this, new ClientConnectionEventArgs<T>(client , e1.Reason));
                                     };
 
                                     lock (this)
@@ -95,7 +99,7 @@ namespace SockGet.Server
                                         clients.Add(client);
                                     }
 
-                                    ClientConnected?.Invoke(this, new ClientConnectionEventArgs(client));
+                                    ClientConnected?.Invoke(this, new ClientConnectionEventArgs<T>(client));
                                 }
                             };
                             client.Listen();

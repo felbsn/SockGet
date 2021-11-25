@@ -1,4 +1,4 @@
-﻿using SockGet.Extensions;
+﻿using SockGet.Core.Extensions;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,23 +9,27 @@ using System.Threading.Tasks;
 
 namespace SockGet.Data.Streams
 {
-    public class SGSocketStream : Stream
+    /// <summary>
+    /// Read socket as a fixed length stream
+    /// </summary>
+    public class SgSocketStream : Stream
     {
-        Socket socket;
-        int position;
-    
-        internal SGSocketStream( Socket socket , int length)
-        {
-            this.socket = socket;
-            Length = length;
-            position = 0;
-        }
+
         public override bool CanRead { get => position < Length; } 
         public override bool CanSeek { get => false; }
         public override bool CanWrite { get => false; } 
         public override long Length { get; }
         public override long Position { get => position; set => throw new NotImplementedException(); }
 
+        Socket socket;
+        int position;
+
+        internal SgSocketStream(Socket socket, int length)
+        {
+            this.socket = socket;
+            Length = length;
+            position = 0;
+        }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
@@ -33,21 +37,17 @@ namespace SockGet.Data.Streams
             {
                 var receiveCount = Math.Min((int)Length - position, count);
 
-                int read = 0;
-
-
-
+ 
                 var readed = socket.ReadBytes(buffer , offset, receiveCount);
 
-                position += receiveCount;
+                position += readed;
 
-                return receiveCount;
+                return readed;
             }
             else
                 return 0;
         }
-
-
+ 
         public override void Flush()
         {
             throw new NotImplementedException();

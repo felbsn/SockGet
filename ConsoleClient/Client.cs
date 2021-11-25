@@ -33,7 +33,7 @@ namespace ConsoleClient
 
             try
             {
-                var client = new SGClient();
+                var client = new SgClient();
 
                 client.AuthToken = name;
                 client.Tags["name"] = "client_" + name;
@@ -65,7 +65,7 @@ namespace ConsoleClient
                 {
                     if (e.Data.Head != name)
                     {
-                        Message(e.Data.Head, e.Data.Body);
+                        Message(e.Data.Head, e.Data.AsString());
                     }
                 };
 
@@ -76,8 +76,8 @@ namespace ConsoleClient
                         Console.Write(">");
                         var line = Console.ReadLine();
 
-                        var response = client.Request(name, line);
-                        if(response.IsOK)
+                        var response = client.Request(new SockGet.Data.Message().Load(name, line));
+                        if(response.Status == SockGet.Enums.Status.OK)
                         {
                             Log("message was successfully sent");
                         }else

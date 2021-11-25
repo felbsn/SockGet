@@ -1,4 +1,6 @@
 ﻿using SockGet.Core.Enums;
+using SockGet.Core.Extensions;
+using SockGet.Enums;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,60 +12,66 @@ namespace SockGet.Data
 {
     public class Response : Message
     {
+        public Status Status { get; set; }
         public static Response Cancel(string message = null, string details = null)
         {
             return new Response()
             {
                 Head = message,
-                Body = details,
-                Info = "@cancel",
-                IsError = true,
+                Body = details.ToStream(),
+                Status = Status.Cancel,
             };
         }
-        public static Response OK(string message = null, string details = null)
+        public static Response Ok(string message = null, string details = null)
         {
             return new Response()
             {
                 Head = message,
-                Body = details,
-                Info = "@ok"
+                Body = details.ToStream(),
+                Status = Status.OK,
             };
         }
         public static Response Error(string message = null,string details = null)
         {
             return new Response()
             {
-                Body = details,
+                Body = details.ToStream(),
                 Head = message,
-                Info = "@error",
-                IsError = true,
+                Status = Status.Error,
             };
         }
-
-
 
         public static Response Reject(string message = null, string details = null)
         {
             return new Response()
             {
-                Body = details,
+                Body = details.ToStream(),
                 Head = message,
-                Info = "@reject",
-                IsError = true,
+                Status = Status.Rejected
             };
         }
 
-        public static Response From(object body)
+        public static Response From(string head  , object body , Status status = Status.OK)
         {
-            return From("", body);
+            var response = new Response();
+            switch (body)
+            {
+                case byte[] data :
+                    response.Load(head, data);
+                    break;
+                case Stream data:
+                    response.Load(head, data);
+                    break;
+                default:
+                    response.Load(head, body);
+                    break;
+            }
+            return response;
         }
-        public static Response From(string head, object body)
+        public static Response From(object body, Status status = Status.OK)
         {
-            var res = new Response();
-            res.Load(head, body);
-            return res;
+            return From(String.Empty, body, status);
         }
-
 
         public static Response Empty  => new Response() { };
 

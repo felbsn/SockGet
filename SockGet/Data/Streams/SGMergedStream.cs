@@ -7,18 +7,21 @@ using System.Threading.Tasks;
 
 namespace SockGet.Data.Streams
 {
-    public class SGMergedStream : Stream
+    /// <summary>
+    /// Simulate multiple streams as one 
+    /// </summary>
+    public class SgMergedStream : Stream
     {
         public Stream[] Streams { get; protected set; }
 
         int index;
         int total_position;
-        int current_position;
-        public SGMergedStream(params Stream[] streams)
+         
+        public SgMergedStream(params Stream[] streams)
         {
             index = 0;
             total_position = 0;
-            current_position = 0;
+     
             Streams = streams.Where(s => s != null && s.Length != 0).ToArray();
             Length = Streams.Sum(s => s.Length);
         }
@@ -51,7 +54,13 @@ namespace SockGet.Data.Streams
             }
         }
 
-
+        public override void Close()
+        {
+            foreach (var stream in Streams)
+            {
+                stream.Close();
+            }
+        }
 
         public override void Flush()
         {
