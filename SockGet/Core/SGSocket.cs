@@ -21,15 +21,19 @@ using Type = SockGet.Core.Enums.Type;
 
 namespace SockGet.Core
 {
-    public abstract class SgSocket
+    public abstract class SgSocket : SgSocket<object>
     {
         public static ISerializer Serializer;
+    }
 
+    public abstract class SgSocket<T>
+    {
         public event EventHandler<DataReceivedEventArgs> DataReceived;
         public event EventHandler<AuthRespondEventArgs> AuthRespond;
         public event EventHandler<ConnectedEventArgs> Connected;
         public event EventHandler<DisconnectedEventArgs> Disconnected;
 
+        public T Data { get; set; }
         public DataReceiver Receiver { get; set; }
         public bool IsAuthorised { get; protected set; }
         public Dictionary<string, string> Tags => tags;
@@ -107,7 +111,7 @@ namespace SockGet.Core
             pending = new Dictionary<uint, TaskCompletionSource<Result>>();
             tags = new Dictionary<string, string>();
 
-            Serializer = Serializer ?? new Serializer();
+            SgSocket.Serializer = SgSocket.Serializer ?? new Serializer();
         }
 
         internal event EventHandler<AuthRequestedEventArgs> AuthRequested;
@@ -318,7 +322,7 @@ namespace SockGet.Core
             {
                 case Enums.Type.Message:
                     {
-                        var args = new DataReceivedEventArgs(received, true, Data.Response.Empty);
+                        var args = new DataReceivedEventArgs(received, true,  Response.Empty);
                         Task.Run(() =>
                         {
                             DataReceived?.Invoke(this, args);
@@ -342,7 +346,7 @@ namespace SockGet.Core
                         AuthRequested?.Invoke(this, args);
  
 
-                        var response = args.Response ?? Data.Response.Empty;
+                        var response = args.Response ?? Response.Empty;
                         if (args.Reject || response.IsError)
                         {
                             Authorize(response, false);

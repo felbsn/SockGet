@@ -18,7 +18,12 @@ using SockGet.Exceptions;
 
 namespace SockGet.Client
 {
-    public class SgClient : SgSocket
+    public class SgClient : SgClient<object>
+    {
+
+    }
+
+    public class SgClient<T> : SgSocket<T>
     {
         public int Port { get; protected set; }
         public string Address { get; protected set; }
